@@ -1,0 +1,39 @@
+@{
+    var active = ViewData["Section"] as string ?? "Games";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] · Game Launcher</title>
+    <link rel="stylesheet" href="/assets/site.css" />
+    <script src="/assets/site.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="app-shell">
+    <aside class="sidebar">
+        <a class="brand" asp-page="/Index"><span class="brand-mark" aria-hidden="true">L<span>↗</span></span><span>Game Launcher<small>YOUR LOCAL LIBRARY</small></span></a>
+        <p class="nav-caption">WORKSPACE</p>
+        <nav aria-label="Main navigation">
+            @foreach (var section in new[] { LibraryCategory.Games, LibraryCategory.Emulators, LibraryCategory.Tools })
+            {
+                <a class="nav-link @(active == section.ToString() ? "active" : "")" asp-page="/Index" asp-route-category="@section" aria-current="@(active == section.ToString() ? "page" : null)"><span class="nav-icon" aria-hidden="true">@(section == LibraryCategory.Games ? "▦" : section == LibraryCategory.Emulators ? "◈" : "⌘")</span>@section</a>
+            }
+            <a class="nav-link @(active == "Settings" ? "active" : "")" asp-page="/Settings" aria-current="@(active == "Settings" ? "page" : null)"><span class="nav-icon" aria-hidden="true">⚙</span>Settings</a>
+        </nav>
+        <div class="sidebar-footer"><span class="status-dot"></span> Local by design<small>Your library. Your machine.</small></div>
+    </aside>
+    <main id="main" class="main" tabindex="-1">
+        <div class="topline"><span>PERSONAL LAUNCHER</span><span class="local-label"><span class="status-dot"></span> ON DEVICE</span></div>
+        @if (TempData["Notice"] is string notice)
+        {
+            <div class="notice toast" role="status" data-toast>@notice</div>
+        }
+        @RenderBody()
+        <footer class="page-footer">Less searching. More playing.<span>GAME LAUNCHER / LOCAL LIBRARY</span></footer>
+    </main>
+</div>
+</body>
+</html>

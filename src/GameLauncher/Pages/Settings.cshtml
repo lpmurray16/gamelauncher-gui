@@ -1,0 +1,9 @@
+@page
+@model SettingsModel
+@{
+    ViewData["Title"] = "Settings";
+    ViewData["Section"] = "Settings";
+}
+<header class="page-heading"><div><p class="eyebrow">UNDER THE HOOD</p><h1>Settings<span class="heading-dot">.</span></h1><p class="lede">A local library, without the extra noise.</p></div></header>
+<section class="panel"><div class="panel-heading"><span class="step-number" aria-hidden="true">⌂</span><div><h2>Local storage</h2><p>Your library is stored on this Windows device.</p></div></div><dl class="settings-list"><div><dt>Data directory</dt><dd><code>@Model.DataDirectory</code></dd></div><div><dt>Library database</dt><dd><code>@Model.DatabasePath</code></dd></div></dl><p class="helper">To make a backup, close Game Launcher before copying its data directory. Removing a library entry never removes the executable itself.</p></section>
+<section class="panel"><h2>What this version supports</h2><div class="capability-grid"><div><span class="capability-label">AVAILABLE</span><h3>Your launch files, organized</h3><p>Launch games, emulator executables and tools with custom arguments and working directories. Search, favorite and import from folder scans.</p></div><div><span class="capability-label muted">NOT YET IMPLEMENTED</span><h3>No hidden integrations</h3><p>Artwork downloads, metadata providers, cloud sync and emulator ROM profiles are not included. This page is informational; there are no provider or account settings to configure.</p></div></div></section>

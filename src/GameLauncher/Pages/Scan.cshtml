@@ -1,0 +1,37 @@
+@page
+@model ScanModel
+@{
+    ViewData["Title"] = "Scan a folder";
+    ViewData["Section"] = Model.Category.ToString();
+}
+<a class="back-link" asp-page="/Index" asp-route-category="@Model.Category">← Back to @Model.Category</a>
+<header class="page-heading"><div><p class="eyebrow">BUILD YOUR COLLECTION</p><h1>Discover local entries<span class="heading-dot">.</span></h1><p class="lede">Choose a folder. Review what we find. Import only what you want.</p></div></header>
+<div asp-validation-summary="All" class="validation" role="alert"></div>
+<section class="panel"><div class="panel-heading"><span class="step-number">01</span><div><h2>Choose a folder</h2><p>Find .exe files, Windows .lnk shortcuts, and supported Steam .url shortcuts. Nothing is launched or imported automatically.</p></div></div>
+<form method="post" asp-page-handler="Scan" data-scan-form>
+    <input asp-for="Category" type="hidden" />
+    <div class="field"><label asp-for="Root">Folder path</label><div class="input-action"><input asp-for="Root" spellcheck="false" placeholder="C:\Games" /><button type="submit" class="button secondary" asp-page-handler="Browse" formnovalidate data-browse>Browse folders</button></div><small>The folder picker opens a native Windows dialog.</small></div>
+    <div class="scan-options"><label class="check-label"><input asp-for="Recursive" /> Include subfolders</label><button type="submit" class="button primary" data-scan-button>Scan folder <span aria-hidden="true">↗</span></button></div>
+    <div class="scan-progress" role="status" aria-live="polite" hidden><span class="spinner" aria-hidden="true"></span><div><strong>Scanning your folder…</strong><p>Looking for local launch files. Large folders may take a moment.</p></div></div>
+</form></section>
+@if (Model.Result is not null)
+{
+    <section class="panel results-panel"><div class="panel-heading"><span class="step-number">02</span><div><h2>Review discoveries <span class="count-pill">@Model.Result.Candidates.Count</span></h2><p>Select trusted executables and shortcuts to add to @Model.Category. Helpers and uninstallers may also appear. Shortcuts can run programs with their own arguments; only select files you trust.</p></div></div>
+    @if (Model.Result.Truncated) { <div class="notice warning" role="status">The scan reached its safety limit. Results may be incomplete; scan a smaller folder for more targeted results.</div> }
+    @if (Model.Result.Warnings.Count > 0) { <details class="scan-warnings"><summary>Scan notes (@Model.Result.Warnings.Count)</summary><ul>@foreach (var warning in Model.Result.Warnings) { <li>@warning</li> }</ul></details> }
+    @if (Model.Result.Candidates.Count == 0)
+    {
+        <div class="inline-empty"><h3>No launch files found</h3><p>Choose another folder or include subfolders and scan again.</p></div>
+    }
+    else
+    {
+        <form method="post" asp-page-handler="Import" data-import-form data-busy-form data-busy-label="Importing…"><input asp-for="Category" type="hidden" id="import-category" /><input asp-for="ScanId" type="hidden" /><input asp-for="Recursive" type="hidden" id="import-recursive" /><input asp-for="Root" type="hidden" id="import-root" />
+        <div class="review-toolbar"><label class="check-label"><input type="checkbox" data-select-all /> Select all discoveries</label><span data-selection-count aria-live="polite">@Model.SelectedIds.Count selected</span></div>
+        <div class="candidate-list">@foreach (var candidate in Model.Result.Candidates)
+        {
+            <label class="candidate"><input type="checkbox" name="SelectedIds" value="@candidate.Id" checked="@Model.SelectedIds.Contains(candidate.Id)" /><span><strong>@candidate.Title</strong><small>@candidate.TargetPath</small></span><span class="candidate-type" aria-hidden="true">@System.IO.Path.GetExtension(candidate.TargetPath).TrimStart('.').ToUpperInvariant()</span></label>
+        }</div>
+        <div class="form-footer"><p>Only library entries are created. Files stay where they are.</p><button type="submit" class="button primary">Import selected <span aria-hidden="true">↗</span></button></div></form>
+    }
+    </section>
+}

@@ -1,0 +1,34 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = Model.Category.ToString();
+    ViewData["Section"] = Model.Category.ToString();
+}
+<header class="page-heading">
+    <div><p class="eyebrow">READY WHEN YOU ARE</p><h1>@Model.Category<span class="heading-dot">.</span></h1><p class="lede">@(Model.Category == LibraryCategory.Emulators ? "Your emulator executables, in one place. ROM profiles are not supported yet." : Model.Category == LibraryCategory.Tools ? "The utilities that keep your setup running." : "Everything you play. One place to launch.")</p></div>
+    <div class="actions"><a class="button secondary" asp-page="/Scan" asp-route-category="@Model.Category">Scan a folder</a><a class="button primary" asp-page="/Edit" asp-route-category="@Model.Category"><span aria-hidden="true">＋</span> Add entry</a></div>
+</header>
+<div asp-validation-summary="All" class="validation" role="alert"></div>
+<section class="library-toolbar" aria-label="Filter library">
+    <div class="tabs"><a class="tab @(!Model.Favorites ? "selected" : "")" asp-page="/Index" asp-route-category="@Model.Category" asp-route-search="@Model.Search">All entries <span>@Model.MatchingCount</span></a><a class="tab @(Model.Favorites ? "selected" : "")" asp-page="/Index" asp-route-category="@Model.Category" asp-route-search="@Model.Search" asp-route-favorites="true">Favorites <span>@Model.FavoriteCount</span></a></div>
+    <form method="get" class="search-form"><input type="hidden" name="category" value="@Model.Category" /><input type="hidden" name="favorites" value="@Model.Favorites.ToString().ToLowerInvariant()" /><label class="sr-only" for="search">Search this category</label><input id="search" type="search" name="search" value="@Model.Search" placeholder="Search your library…" /><button type="submit" class="search-button" aria-label="Search">↗</button></form>
+</section>
+@if (Model.Entries.Count == 0)
+{
+    <section class="empty-state"><div class="empty-symbol" aria-hidden="true">▦</div><p class="eyebrow">MAKE IT YOURS</p><h2>@(!string.IsNullOrWhiteSpace(Model.Search) ? "No matching entries" : Model.Favorites ? "Your favorites start here" : "A clean slate. A great setup.")</h2><p>@(!string.IsNullOrWhiteSpace(Model.Search) ? "Try another search or return to the full category." : Model.Favorites ? "Select the star on an entry to keep it close at hand." : "Add an executable or scan a folder to bring your local library together.")</p><div class="actions"><a class="button secondary" asp-page="/Index" asp-route-category="@Model.Category">View all entries</a><a class="button primary" asp-page="/Scan" asp-route-category="@Model.Category">Scan a folder <span aria-hidden="true">↗</span></a></div></section>
+}
+else
+{
+    <div class="section-label"><span>@Model.Entries.Count ENTRIES IN VIEW</span><span>FAVORITES FIRST · A–Z</span></div>
+    <section class="entry-grid" aria-label="Library entries">
+    @foreach (var entry in Model.Entries)
+    {
+        <article class="entry-card">
+            <div class="card-top"><div class="entry-monogram" aria-hidden="true">@(string.IsNullOrWhiteSpace(entry.Title) ? "↗" : entry.Title.Trim().Substring(0, 1).ToUpperInvariant())</div><span class="type-label">@entry.Category</span><form method="post" asp-page-handler="Favorite" asp-route-category="@Model.Category" asp-route-search="@Model.Search" asp-route-favorites="@Model.Favorites"><input type="hidden" name="id" value="@entry.Id" /><button class="favorite @(entry.IsFavorite ? "is-favorite" : "")" type="submit" aria-pressed="@entry.IsFavorite.ToString().ToLowerInvariant()" aria-label="@(entry.IsFavorite ? "Remove " + entry.Title + " from favorites" : "Favorite " + entry.Title)">@(entry.IsFavorite ? "★" : "☆")</button></form></div>
+            <h2>@entry.Title</h2><p class="entry-path" title="@entry.TargetPath">@entry.TargetPath</p>
+            <p class="last-played">@(entry.LastLaunchedUtc.HasValue ? "Last launched " + entry.LastLaunchedUtc.Value.ToLocalTime().ToString("MMM d, yyyy · HH:mm") : "Not launched yet")</p>
+            <div class="card-actions"><form method="post" asp-page-handler="Launch" asp-route-category="@Model.Category" asp-route-search="@Model.Search" asp-route-favorites="@Model.Favorites" data-busy-form data-busy-label="Launching…"><input type="hidden" name="id" value="@entry.Id" /><button class="button launch" type="submit"><span aria-hidden="true">▶</span> Launch</button></form><a class="button edit-button" asp-page="/Edit" asp-route-id="@entry.Id" aria-label="Edit @entry.Title">Edit <span aria-hidden="true">↗</span></a></div>
+        </article>
+    }
+    </section>
+}

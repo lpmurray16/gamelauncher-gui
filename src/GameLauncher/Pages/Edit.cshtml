@@ -1,0 +1,22 @@
+@page
+@model EditModel
+@{
+    ViewData["Title"] = Model.Id.HasValue ? "Edit entry" : "Add entry";
+    ViewData["Section"] = Model.Category.ToString();
+}
+<a class="back-link" asp-page="/Index" asp-route-category="@Model.Category">← Back to @Model.Category</a>
+<header class="page-heading"><div><p class="eyebrow">YOUR LIBRARY, YOUR WAY</p><h1>@ViewData["Title"]<span class="heading-dot">.</span></h1><p class="lede">Point to a local executable or shortcut. Keep its launch settings together.</p></div></header>
+<div asp-validation-summary="All" class="validation" role="alert"></div>
+<form method="post" class="panel editor" data-busy-form data-busy-label="Saving…">
+    <input asp-for="Id" type="hidden" />
+    <div class="panel-heading"><span class="step-number">01</span><div><h2>Entry details</h2><p>The essentials for a one-click launch.</p></div></div>
+    <div class="form-grid"><div class="field"><label asp-for="Title">Display name <span class="required">*</span></label><input asp-for="Title" placeholder="Name your entry" maxlength="200" required /><span asp-validation-for="Title"></span></div><div class="field"><label asp-for="Category"></label><select asp-for="Category" asp-items="Html.GetEnumSelectList<LibraryCategory>()"></select></div></div>
+    <div class="field"><label asp-for="TargetPath">Launch file path <span class="required">*</span></label><input asp-for="TargetPath" placeholder="C:\Games\MyGame\game.exe" required spellcheck="false" /><span asp-validation-for="TargetPath"></span><small>Use the full path to a trusted .exe, .lnk, or Steam game .url shortcut. Windows shortcuts can run programs with their own arguments; only add shortcuts you trust.</small></div>
+    <div class="form-grid"><div class="field"><label asp-for="Arguments">Launch arguments <span class="optional">optional</span></label><input asp-for="Arguments" spellcheck="false" placeholder="Additional command-line options" /><small>Custom arguments apply to .exe files. Shortcuts keep their own arguments.</small></div><div class="field"><label asp-for="WorkingDirectory">Working directory <span class="optional">optional</span></label><input asp-for="WorkingDirectory" spellcheck="false" placeholder="Default: executable folder" /></div></div>
+    <label class="check-label"><input asp-for="IsFavorite" /> Keep this entry in favorites</label>
+    <div class="form-footer"><a class="button secondary" asp-page="/Index" asp-route-category="@Model.Category">Cancel</a><button type="submit" class="button primary">@(Model.Id.HasValue ? "Save changes" : "Add to library") <span aria-hidden="true">↗</span></button></div>
+</form>
+@if (Model.Id.HasValue)
+{
+    <section class="panel danger-panel"><h2>Remove from library</h2><p>This only removes the entry from Game Launcher. It does not delete or uninstall any files.</p><form method="post" asp-page-handler="Delete"><input asp-for="Id" type="hidden" id="delete-id" /><label class="check-label"><input asp-for="ConfirmRemoval" required /> I want to remove this library entry.</label><button class="button danger" type="submit">Remove entry</button></form></section>
+}
