@@ -17,6 +17,10 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
         entry.Property(x => x.TargetKey).HasMaxLength(32767).IsRequired();
         entry.Property(x => x.Arguments).HasMaxLength(8192).IsRequired();
         entry.Property(x => x.WorkingDirectory).HasMaxLength(32767).IsRequired();
+        entry.Property(x => x.CoverImageFile).HasMaxLength(512);
+        entry.Property(x => x.HeroImageFile).HasMaxLength(512);
+        entry.Property(x => x.ProviderName).HasMaxLength(50);
+        entry.Property(x => x.ProviderTitle).HasMaxLength(200);
         entry.HasIndex(x => x.TargetKey).IsUnique();
     }
 }

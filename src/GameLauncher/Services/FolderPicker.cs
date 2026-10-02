@@ -5,39 +5,61 @@ namespace GameLauncher.Services;
 public sealed class FolderPicker
 {
     private Form? _owner;
-    private int _busy;
     public void Attach(Form owner) => _owner = owner;
 
     public Task<string?> PickAsync()
     {
+        var owner = OwnerOrThrow();
+        return RunDialog(owner, () =>
+        {
+            using var dialog = new FolderBrowserDialog
+            {
+                Description = "Choose a folder to scan for games, emulators, or tools",
+                UseDescriptionForTitle = true,
+                ShowNewFolderButton = false
+            };
+            return dialog.ShowDialog(owner) == DialogResult.OK ? dialog.SelectedPath : null;
+        });
+    }
+
+    public Task<string?> PickImageAsync()
+    {
+        var owner = OwnerOrThrow();
+        return RunDialog(owner, () =>
+        {
+            using var dialog = new OpenFileDialog
+            {
+                Title = "Choose an image",
+                Filter = "Images|*.png;*.jpg;*.jpeg;*.webp",
+                CheckFileExists = true,
+                Multiselect = false
+            };
+            return dialog.ShowDialog(owner) == DialogResult.OK ? dialog.FileName : null;
+        });
+    }
+
+    private Form OwnerOrThrow()
+    {
         var owner = _owner;
         if (owner is null || owner.IsDisposed || !owner.IsHandleCreated)
             throw new InvalidOperationException("The desktop window is not ready.");
-        if (Interlocked.Exchange(ref _busy, 1) != 0)
-            throw new InvalidOperationException("A folder dialog is already open.");
+        return owner;
+    }
+
+    private static Task<string?> RunDialog(Form owner, Func<string?> show)
+    {
         var completion = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
         try
         {
-            owner.BeginInvoke((Action)(() =>
+            owner.Invoke((Action)(() =>
             {
-                try
-                {
-                    using var dialog = new FolderBrowserDialog
-                    {
-                        Description = "Choose a folder to scan for games, emulators, or tools",
-                        UseDescriptionForTitle = true,
-                        ShowNewFolderButton = false
-                    };
-                    completion.TrySetResult(dialog.ShowDialog(owner) == DialogResult.OK ? dialog.SelectedPath : null);
-                }
+                try { completion.TrySetResult(show()); }
                 catch (Exception ex) { completion.TrySetException(ex); }
-                finally { Interlocked.Exchange(ref _busy, 0); }
             }));
         }
-        catch
+        catch (Exception ex)
         {
-            Interlocked.Exchange(ref _busy, 0);
-            throw;
+            return Task.FromException<string?>(ex);
         }
         return completion.Task;
     }

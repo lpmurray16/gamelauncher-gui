@@ -3,31 +3,110 @@
 @{
     ViewData["Title"] = Model.Category.ToString();
     ViewData["Section"] = Model.Category.ToString();
+    var featured = Model.Featured;
+    var featuredHero = featured?.HeroImageFile ?? featured?.CoverImageFile;
 }
 <header class="page-heading">
     <div><p class="eyebrow">READY WHEN YOU ARE</p><h1>@Model.Category<span class="heading-dot">.</span></h1><p class="lede">@(Model.Category == LibraryCategory.Emulators ? "Your emulator executables, in one place. ROM profiles are not supported yet." : Model.Category == LibraryCategory.Tools ? "The utilities that keep your setup running." : "Everything you play. One place to launch.")</p></div>
     <div class="actions"><a class="button secondary" asp-page="/Scan" asp-route-category="@Model.Category">Scan a folder</a><a class="button primary" asp-page="/Edit" asp-route-category="@Model.Category"><span aria-hidden="true">＋</span> Add entry</a></div>
 </header>
 <div asp-validation-summary="All" class="validation" role="alert"></div>
+
+@if (featured is not null)
+{
+    <section class="hero-banner" aria-label="Featured entry">
+        @if (featuredHero is not null) { <img class="hero-image" src="/artwork/image/@featuredHero" alt="" /> }
+        <div class="hero-content">
+            <p class="eyebrow">@(featured.LastLaunchedUtc.HasValue ? "JUMP BACK IN" : Model.FeaturedIsFavorite ? "FROM YOUR FAVORITES" : "FEATURED")</p>
+            <h2>@featured.Title</h2>
+            @if (featured.LastLaunchedUtc.HasValue) { <p class="hero-meta">Last launched @featured.LastLaunchedUtc.Value.ToLocalTime().ToString("MMM d · HH:mm")</p> }
+            <form method="post" asp-page-handler="Launch" asp-route-category="@Model.Category" asp-route-search="@Model.Search" asp-route-sort="@Model.Sort" asp-route-favorites="@Model.Favorites" data-busy-form data-busy-label="Launching…">
+                <input type="hidden" name="id" value="@featured.Id" />
+                <button class="button launch hero-launch" type="submit"><span aria-hidden="true">▶</span> Play</button>
+            </form>
+        </div>
+        @if (featured.LastLaunchedUtc.HasValue && Model.FallbackFeatured is not null)
+        {
+            <div class="hero-side">
+                <span class="hero-side-label">FEATURED</span>
+                <span class="hero-side-title">@Model.FallbackFeatured.Title</span>
+            </div>
+        }
+    </section>
+}
+
 <section class="library-toolbar" aria-label="Filter library">
-    <div class="tabs"><a class="tab @(!Model.Favorites ? "selected" : "")" asp-page="/Index" asp-route-category="@Model.Category" asp-route-search="@Model.Search">All entries <span>@Model.MatchingCount</span></a><a class="tab @(Model.Favorites ? "selected" : "")" asp-page="/Index" asp-route-category="@Model.Category" asp-route-search="@Model.Search" asp-route-favorites="true">Favorites <span>@Model.FavoriteCount</span></a></div>
-    <form method="get" class="search-form"><input type="hidden" name="category" value="@Model.Category" /><input type="hidden" name="favorites" value="@Model.Favorites.ToString().ToLowerInvariant()" /><label class="sr-only" for="search">Search this category</label><input id="search" type="search" name="search" value="@Model.Search" placeholder="Search your library…" /><button type="submit" class="search-button" aria-label="Search">↗</button></form>
+    <div class="tabs"><a class="tab @(!Model.Favorites ? "selected" : "")" asp-page="/Index" asp-route-category="@Model.Category" asp-route-search="@Model.Search" asp-route-sort="@Model.Sort">All entries <span>@Model.MatchingCount</span></a><a class="tab @(Model.Favorites ? "selected" : "")" asp-page="/Index" asp-route-category="@Model.Category" asp-route-search="@Model.Search" asp-route-sort="@Model.Sort" asp-route-favorites="true">Favorites <span>@Model.FavoriteCount</span></a></div>
+    <form method="get" class="search-form"><input type="hidden" name="sort" value="@Model.Sort" /><input type="hidden" name="category" value="@Model.Category" /><input type="hidden" name="favorites" value="@Model.Favorites.ToString().ToLowerInvariant()" /><label class="sr-only" for="search">Search this category</label><input id="search" type="search" name="search" value="@Model.Search" placeholder="Search your library…" /><button type="submit" class="search-button" aria-label="Search">↗</button></form>
 </section>
+
+<nav class="library-sort" aria-label="Sort library">
+    <span class="sort-caption">Sort by</span>
+    @foreach (var option in new[] { (Value: "favorites", Label: "Favorites first"), (Value: "az", Label: "A–Z"), (Value: "za", Label: "Z–A"), (Value: "recent", Label: "Last played") })
+    {
+        <a class="sort-chip @(Model.Sort == option.Value ? "selected" : "")"
+           asp-page="/Index" asp-route-category="@Model.Category" asp-route-search="@Model.Search"
+           asp-route-favorites="@Model.Favorites" asp-route-sort="@option.Value"
+           aria-current="@(Model.Sort == option.Value ? "true" : null)">@option.Label</a>
+    }
+</nav>
+
 @if (Model.Entries.Count == 0)
 {
     <section class="empty-state"><div class="empty-symbol" aria-hidden="true">▦</div><p class="eyebrow">MAKE IT YOURS</p><h2>@(!string.IsNullOrWhiteSpace(Model.Search) ? "No matching entries" : Model.Favorites ? "Your favorites start here" : "A clean slate. A great setup.")</h2><p>@(!string.IsNullOrWhiteSpace(Model.Search) ? "Try another search or return to the full category." : Model.Favorites ? "Select the star on an entry to keep it close at hand." : "Add an executable or scan a folder to bring your local library together.")</p><div class="actions"><a class="button secondary" asp-page="/Index" asp-route-category="@Model.Category">View all entries</a><a class="button primary" asp-page="/Scan" asp-route-category="@Model.Category">Scan a folder <span aria-hidden="true">↗</span></a></div></section>
 }
 else
 {
-    <div class="section-label"><span>@Model.Entries.Count ENTRIES IN VIEW</span><span>FAVORITES FIRST · A–Z</span></div>
+    <div class="section-label"><span>@Model.Entries.Count ENTRIES IN VIEW</span><span>@Model.SortLabel</span></div>
     <section class="entry-grid" aria-label="Library entries">
     @foreach (var entry in Model.Entries)
     {
         <article class="entry-card">
-            <div class="card-top"><div class="entry-monogram" aria-hidden="true">@(string.IsNullOrWhiteSpace(entry.Title) ? "↗" : entry.Title.Trim().Substring(0, 1).ToUpperInvariant())</div><span class="type-label">@entry.Category</span><form method="post" asp-page-handler="Favorite" asp-route-category="@Model.Category" asp-route-search="@Model.Search" asp-route-favorites="@Model.Favorites"><input type="hidden" name="id" value="@entry.Id" /><button class="favorite @(entry.IsFavorite ? "is-favorite" : "")" type="submit" aria-pressed="@entry.IsFavorite.ToString().ToLowerInvariant()" aria-label="@(entry.IsFavorite ? "Remove " + entry.Title + " from favorites" : "Favorite " + entry.Title)">@(entry.IsFavorite ? "★" : "☆")</button></form></div>
-            <h2>@entry.Title</h2><p class="entry-path" title="@entry.TargetPath">@entry.TargetPath</p>
-            <p class="last-played">@(entry.LastLaunchedUtc.HasValue ? "Last launched " + entry.LastLaunchedUtc.Value.ToLocalTime().ToString("MMM d, yyyy · HH:mm") : "Not launched yet")</p>
-            <div class="card-actions"><form method="post" asp-page-handler="Launch" asp-route-category="@Model.Category" asp-route-search="@Model.Search" asp-route-favorites="@Model.Favorites" data-busy-form data-busy-label="Launching…"><input type="hidden" name="id" value="@entry.Id" /><button class="button launch" type="submit"><span aria-hidden="true">▶</span> Launch</button></form><a class="button edit-button" asp-page="/Edit" asp-route-id="@entry.Id" aria-label="Edit @entry.Title">Edit <span aria-hidden="true">↗</span></a></div>
+            <div class="cover">
+                @if (entry.CoverImageFile is not null)
+                {
+                    <img src="/artwork/image/@entry.CoverImageFile" alt="Cover for @entry.Title" loading="lazy" />
+                }
+                else
+                {
+                    <div class="cover-fallback" aria-hidden="true"><span>@(string.IsNullOrWhiteSpace(entry.Title) ? "↗" : entry.Title.Trim().Substring(0, 1).ToUpperInvariant())</span></div>
+                }
+
+                <!-- Favorite button (top-left, always visible) -->
+                <form method="post" asp-page-handler="Favorite" asp-route-category="@Model.Category" asp-route-search="@Model.Search" asp-route-sort="@Model.Sort" asp-route-favorites="@Model.Favorites" class="cover-favorite"><input type="hidden" name="id" value="@entry.Id" /><button class="favorite @(entry.IsFavorite ? "is-favorite" : "")" type="submit" aria-pressed="@entry.IsFavorite.ToString().ToLowerInvariant()" aria-label="@(entry.IsFavorite ? "Remove " + entry.Title + " from favorites" : "Favorite " + entry.Title)">@(entry.IsFavorite ? "★" : "☆")</button></form>
+
+                <!-- Hover action overlay -->
+                <div class="cover-overlay">
+                    <!-- Options menu (top-right) -->
+                    <div class="overlay-action overlay-menu">
+                        <button class="btn-icon menu-trigger" aria-label="Options for @entry.Title" aria-expanded="false" aria-haspopup="true">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                        </button>
+                        <div class="menu-dropdown" role="menu">
+                            <a class="menu-item" asp-page="/Edit" asp-route-id="@entry.Id" role="menuitem" aria-label="Edit @entry.Title">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                Edit
+                            </a>
+                            <a class="menu-item" asp-page="/Artwork" asp-route-id="@entry.Id" role="menuitem" aria-label="Artwork for @entry.Title">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                Art
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Play button (centered) -->
+                    <form method="post" asp-page-handler="Launch" asp-route-category="@Model.Category" asp-route-search="@Model.Search" asp-route-sort="@Model.Sort" asp-route-favorites="@Model.Favorites" data-busy-form data-busy-label="Launching…" class="overlay-action overlay-play" aria-label="Play @entry.Title">
+                        <input type="hidden" name="id" value="@entry.Id" />
+                        <button class="btn-icon" type="submit" aria-label="Play @entry.Title">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <div class="card-body">
+                <h2 title="@entry.Title">@entry.Title</h2>
+                <p class="last-played">@(entry.LastLaunchedUtc.HasValue ? "Last launched " + entry.LastLaunchedUtc.Value.ToLocalTime().ToString("MMM d · HH:mm") : "Not launched yet")</p>
+            </div>
         </article>
     }
     </section>

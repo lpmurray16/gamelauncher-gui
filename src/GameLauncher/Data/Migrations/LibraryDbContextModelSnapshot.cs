@@ -6,5 +6,5 @@ namespace GameLauncher.Data.Migrations;
 [DbContext(typeof(LibraryDbContext))]
 public sealed class LibraryDbContextModelSnapshot : ModelSnapshot
 {
-    protected override void BuildModel(ModelBuilder modelBuilder) => InitialSchema.Build(modelBuilder);
+    protected override void BuildModel(ModelBuilder modelBuilder) => CurrentSchema.Build(modelBuilder);
 }

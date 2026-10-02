@@ -43,8 +43,11 @@ No Steam, Epic, or other storefront account/library integrations. Launching an e
 
 ### Metadata and artwork
 
-- Optional API-based game metadata and artwork lookup.
-- Provider selection remains open pending authentication, terms, redistribution, and coverage review.
+- The default/minimal experience assumes no API keys. Installing, scanning, managing, and launching games must not require a provider account or key.
+- Artwork-first cards and dashboard presentation must not depend on configuring a provider. Planned no-key fallbacks: user-selected local covers/backgrounds, executable icons, and a styled placeholder when no artwork exists.
+- Optional API-based game metadata and artwork lookup is a power-user enhancement.
+- Settings should let users paste, replace, and remove their own provider API keys. Planned Windows storage uses per-user DPAPI encryption in application data; keys must never be committed, logged, or sent back to the page after saving.
+- Provider selection remains open pending authentication, terms, redistribution, and coverage review. Automatic artwork without a key requires a separately validated key-free source; do not assume arbitrary web scraping is a reliable substitute.
 - Present candidate matches for ambiguous titles.
 - Cache downloaded artwork where provider terms allow.
 - Preserve manual overrides.

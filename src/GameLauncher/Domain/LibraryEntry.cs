@@ -2,6 +2,8 @@ namespace GameLauncher.Domain;
 
 public enum LibraryCategory { Games, Emulators, Tools }
 
+public enum ArtworkKind { Cover, Hero }
+
 public sealed class LibraryEntry
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -12,6 +14,12 @@ public sealed class LibraryEntry
     public string WorkingDirectory { get; set; } = "";
     public LibraryCategory Category { get; set; }
     public bool IsFavorite { get; set; }
+    // File names relative to the application artwork directory; null means "fallback art".
+    public string? CoverImageFile { get; set; }
+    public string? HeroImageFile { get; set; }
+    public string? ProviderName { get; set; }
+    public string? ProviderTitle { get; set; }
+    public int? ProviderGameId { get; set; }
     public DateTime AddedUtc { get; set; } = DateTime.UtcNow;
     public DateTime? LastLaunchedUtc { get; set; }
 }

@@ -8,6 +8,7 @@
     <RootNamespace>GameLauncher</RootNamespace>
     <AssemblyName>GameLauncher</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>GameLauncher.ico</ApplicationIcon>
     <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
   <ItemGroup>
@@ -15,8 +16,17 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Static files are embedded and served from /assets/*, not the default static web root. -->
     <Content Remove="wwwroot/**" />
     <EmbeddedResource Include="wwwroot/site.css" LogicalName="GameLauncher.site.css" />
     <EmbeddedResource Include="wwwroot/site.js" LogicalName="GameLauncher.site.js" />
+    <EmbeddedResource Include="GameLauncher.ico" LogicalName="GameLauncher.icon.ico" />
   </ItemGroup>
+  <!-- WebView2 adds both UI adapters; this WinForms host does not use WPF.
+       Remove the unused adapter after package imports, before assembly resolution. -->
+  <Target Name="RemoveUnusedWebView2WpfReference" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+    </ItemGroup>
+  </Target>
 </Project>

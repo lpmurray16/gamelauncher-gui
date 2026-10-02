@@ -7,6 +7,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@ViewData["Title"] · Game Launcher</title>
+    <link rel="icon" href="/icon.ico" />
     <link rel="stylesheet" href="/assets/site.css" />
     <script src="/assets/site.js" defer></script>
 </head>
@@ -14,12 +15,18 @@
 <a class="skip-link" href="#main">Skip to content</a>
 <div class="app-shell">
     <aside class="sidebar">
-        <a class="brand" asp-page="/Index"><span class="brand-mark" aria-hidden="true">L<span>↗</span></span><span>Game Launcher<small>YOUR LOCAL LIBRARY</small></span></a>
+        <a class="brand" asp-page="/Index"><img class="brand-icon" src="/icon.ico" alt="" width="38" height="38" /><span>Launchpad<small>YOUR LOCAL LIBRARY</small></span></a>
         <p class="nav-caption">WORKSPACE</p>
         <nav aria-label="Main navigation">
-            @foreach (var section in new[] { LibraryCategory.Games, LibraryCategory.Emulators, LibraryCategory.Tools })
+            @foreach (var category in new[] { LibraryCategory.Games, LibraryCategory.Emulators, LibraryCategory.Tools })
             {
-                <a class="nav-link @(active == section.ToString() ? "active" : "")" asp-page="/Index" asp-route-category="@section" aria-current="@(active == section.ToString() ? "page" : null)"><span class="nav-icon" aria-hidden="true">@(section == LibraryCategory.Games ? "▦" : section == LibraryCategory.Emulators ? "◈" : "⌘")</span>@section</a>
+                <a class="nav-link @(active == category.ToString() ? "active" : "")"
+                   asp-page="/Index"
+                   asp-route-category="@category"
+                   aria-current="@(active == category.ToString() ? "page" : null)">
+                    <span class="nav-icon" aria-hidden="true">@(category == LibraryCategory.Games ? "▦" : category == LibraryCategory.Emulators ? "◈" : "⌘")</span>
+                    @category
+                </a>
             }
             <a class="nav-link @(active == "Settings" ? "active" : "")" asp-page="/Settings" aria-current="@(active == "Settings" ? "page" : null)"><span class="nav-icon" aria-hidden="true">⚙</span>Settings</a>
         </nav>
@@ -32,6 +39,7 @@
             <div class="notice toast" role="status" data-toast>@notice</div>
         }
         @RenderBody()
+        <p class="navigation-hint">Navigate: arrows / D-pad · Select: Enter / A · Options: Shift+F10 / X · Back: Esc / B · Sidebar: F1 / View · Favorite: Y (controller)</p>
         <footer class="page-footer">Less searching. More playing.<span>GAME LAUNCHER / LOCAL LIBRARY</span></footer>
     </main>
 </div>

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -92,6 +93,17 @@ internal static class Program
         builder.Services.AddSingleton<ScannerService>();
         builder.Services.AddSingleton<FolderPicker>();
         builder.Services.AddSingleton<LibraryService>();
+        builder.Services.AddSingleton<CredentialStore>();
+        builder.Services.AddHttpClient("sgdb", client =>
+        {
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("GameLauncher/0.2 (local library)");
+        }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+        {
+            AutomaticDecompression = System.Net.DecompressionMethods.All,
+            MaxConnectionsPerServer = 4
+        });
+        builder.Services.AddSingleton<SteamGridDbClient>();
+        builder.Services.AddScoped<ArtworkService>();
         builder.Services.AddDbContextFactory<LibraryDbContext>(options => options.UseSqlite(
             new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
             { DataSource = paths.DatabasePath, ForeignKeys = true }.ToString()));
@@ -101,6 +113,8 @@ internal static class Program
             using var scope = app.Services.CreateScope();
             using var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
             db.Database.Migrate();
+            var artwork = scope.ServiceProvider.GetRequiredService<ArtworkService>();
+            artwork.CleanOrphansAsync().GetAwaiter().GetResult();
         }
         catch
         {
@@ -140,6 +154,31 @@ internal static class Program
         }));
         app.MapGet("/assets/site.css", () => EmbeddedAsset("site.css", "text/css; charset=utf-8"));
         app.MapGet("/assets/site.js", () => EmbeddedAsset("site.js", "text/javascript; charset=utf-8"));
+        app.MapGet("/icon.ico", () => EmbeddedAsset("icon.ico", "image/x-icon"));
+        app.MapGet("/artwork/image/{fileName}", (string fileName, AppPaths artworkPaths) =>
+        {
+            try
+            {
+                var (fullPath, contentType) = Services.Artwork.Resolve(artworkPaths, fileName);
+                return Results.File(fullPath, contentType);
+            }
+            catch (Exception) { return TypedResults.NotFound(); }
+        });
+        app.MapGet("/artwork/proxy", async (string url, SteamGridDbClient provider, HttpContext context) =>
+        {
+            try
+            {
+                var (stream, contentType) = await provider.DownloadAsync(url, context.RequestAborted);
+                if (contentType is not ("image/png" or "image/jpeg" or "image/webp"))
+                    return TypedResults.NotFound();
+                return Results.Stream(stream, contentType);
+            }
+            catch (Exception ex)
+            {
+                TryLog(paths, ex);
+                return TypedResults.NotFound();
+            }
+        });
         app.MapRazorPages();
         return app;
     }

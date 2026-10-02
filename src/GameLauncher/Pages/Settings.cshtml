@@ -5,5 +5,29 @@
     ViewData["Section"] = "Settings";
 }
 <header class="page-heading"><div><p class="eyebrow">UNDER THE HOOD</p><h1>Settings<span class="heading-dot">.</span></h1><p class="lede">A local library, without the extra noise.</p></div></header>
-<section class="panel"><div class="panel-heading"><span class="step-number" aria-hidden="true">⌂</span><div><h2>Local storage</h2><p>Your library is stored on this Windows device.</p></div></div><dl class="settings-list"><div><dt>Data directory</dt><dd><code>@Model.DataDirectory</code></dd></div><div><dt>Library database</dt><dd><code>@Model.DatabasePath</code></dd></div></dl><p class="helper">To make a backup, close Game Launcher before copying its data directory. Removing a library entry never removes the executable itself.</p></section>
-<section class="panel"><h2>What this version supports</h2><div class="capability-grid"><div><span class="capability-label">AVAILABLE</span><h3>Your launch files, organized</h3><p>Launch games, emulator executables and tools with custom arguments and working directories. Search, favorite and import from folder scans.</p></div><div><span class="capability-label muted">NOT YET IMPLEMENTED</span><h3>No hidden integrations</h3><p>Artwork downloads, metadata providers, cloud sync and emulator ROM profiles are not included. This page is informational; there are no provider or account settings to configure.</p></div></div></section>
+<div asp-validation-summary="All" class="validation" role="alert"></div>
+
+<section class="panel">
+    <div class="panel-heading"><span class="step-number" aria-hidden="true">⚿</span><div><h2>Artwork provider</h2><p>Artwork is optional. Your key is encrypted for your Windows account on this device and never shown again.</p></div></div>
+    @if (Model.HasSgdbKey)
+    {
+        <p><strong>SteamGridDB:</strong> key saved for this account.</p>
+        <div class="form-footer">
+            <form method="post" asp-page-handler="Check" data-busy-form data-busy-label="Checking…"><button class="button secondary" type="submit">Check connection</button></form>
+            <form method="post" asp-page-handler="Remove"><button class="button danger" type="submit">Remove key</button></form>
+        </div>
+    }
+    <form method="post" asp-page-handler="Save" class="provider-key-form" data-busy-form data-busy-label="Saving…">
+        <div class="field">
+            <label for="ApiKey">@(Model.HasSgdbKey ? "Replace key" : "SteamGridDB API key")</label>
+            <div class="input-action">
+                <input id="ApiKey" asp-for="ApiKey" type="password" autocomplete="off" placeholder="Paste your key here" />
+                <button class="button primary" type="submit">@(Model.HasSgdbKey ? "Replace" : "Save")</button>
+            </div>
+            <small>Get one at steamgriddb.com → Profile → Preferences → API. Without a key you can still add local images per game.</small>
+        </div>
+    </form>
+</section>
+
+<section class="panel"><div class="panel-heading"><span class="step-number" aria-hidden="true">⌂</span><div><h2>Local storage</h2><p>Your library is stored on this Windows device.</p></div></div><dl class="settings-list"><div><dt>Data directory</dt><dd><code>@Model.DataDirectory</code></dd></div><div><dt>Library database</dt><dd><code>@Model.DatabasePath</code></dd></div><div><dt>Artwork</dt><dd><code>@Model.ArtworkDirectory</code></dd></div></dl><p class="helper">To make a backup, close Game Launcher before copying its data directory. Removing a library entry never removes the executable itself.</p></section>
+<section class="panel"><h2>What this version supports</h2><div class="capability-grid"><div><span class="capability-label">AVAILABLE</span><h3>Your launch files, organized</h3><p>Launch games, emulator executables and tools with custom arguments and working directories. Search, favorite, import from folder scans, and assign covers and background images.</p></div><div><span class="capability-label muted">NOT YET IMPLEMENTED</span><h3>No hidden integrations</h3><p>Metadata descriptions, genres, cloud sync and emulator ROM profiles are not included. Storefront accounts are not connected.</p></div></div></section>

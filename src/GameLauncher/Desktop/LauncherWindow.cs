@@ -29,6 +29,9 @@ internal sealed class LauncherWindow : Form
         Size = new Size(1320, 880);
         MinimumSize = new Size(820, 600);
         BackColor = Color.FromArgb(12, 14, 18);
+        using var iconStream = System.Reflection.Assembly.GetExecutingAssembly()
+            .GetManifestResourceStream("GameLauncher.icon.ico");
+        if (iconStream is not null) Icon = new Icon(iconStream);
         Controls.Add(_browser);
         Controls.Add(_status);
     }
