@@ -1,4 +1,44 @@
 "use strict";
+// Keep the viewport and controller focus when changing library filters or sort.
+// Normal navigation still starts at the top; this state is consumed only once.
+(() => {
+  const key = 'library-navigation';
+  const selector = '.library-toolbar .tab:not(.tab-add), .library-sort .sort-chip';
+  const links = Array.from(document.querySelectorAll(selector));
+  let saved = null;
+  try {
+    const raw = sessionStorage.getItem(key);
+    sessionStorage.removeItem(key);
+    saved = raw ? JSON.parse(raw) : null;
+  } catch { /* Storage being unavailable must not block normal navigation. */ }
+  if (saved && saved.url === window.location.href &&
+      Number.isFinite(saved.y) && Number.isFinite(saved.x) &&
+      Date.now() - saved.time >= 0 && Date.now() - saved.time < 30000) {
+    const link = links.find((item) => item.href === saved.url);
+    if (link) {
+      if (saved.directional) document.body.classList.add('directional-navigation');
+      link.focus({ preventScroll: true });
+      // The deferred bundle runs after markup is parsed, before the first paint.
+      // Shorter result sets naturally clamp to the new document's scroll range.
+      window.scrollTo({ left: saved.x, top: saved.y, behavior: 'instant' });
+    }
+  }
+  links.forEach((link) => {
+    link.addEventListener('click', (event) => {
+      if (event.defaultPrevented || event.button !== 0 || event.ctrlKey ||
+          event.metaKey || event.shiftKey || event.altKey || link.target || link.hasAttribute('download')) return;
+      try {
+        sessionStorage.setItem(key, JSON.stringify({
+          url: link.href,
+          x: window.scrollX,
+          y: window.scrollY,
+          time: Date.now(),
+          directional: document.body.classList.contains('directional-navigation')
+        }));
+      } catch { /* Fall back to the ordinary GET link. */ }
+    });
+  });
+})();
 // Window-only actions are allowlisted by the native host; preferences use POST forms.
 document.querySelector('[data-window-fullscreen]')?.addEventListener('click', () => {
   window.chrome?.webview?.postMessage('window.fullscreen');
