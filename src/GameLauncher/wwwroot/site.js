@@ -1,9 +1,50 @@
 "use strict";
+// Window-only actions are allowlisted by the native host; preferences use POST forms.
+document.querySelector('[data-window-fullscreen]')?.addEventListener('click', () => {
+  window.chrome?.webview?.postMessage('window.fullscreen');
+});
+document.querySelector('[data-window-close]')?.addEventListener('click', () => {
+  window.chrome?.webview?.postMessage('window.close');
+});
+window.chrome?.webview?.addEventListener('message', (event) => {
+  if (event.data?.type !== 'window') return;
+  const button = document.querySelector('[data-window-fullscreen]');
+  if (!button) return;
+  const label = event.data.fullscreen ? 'Exit fullscreen (F11)' : 'Enter fullscreen (F11)';
+  button.setAttribute('aria-label', label);
+  button.setAttribute('title', label);
+  button.setAttribute('aria-pressed', String(event.data.fullscreen));
+});
 document.querySelectorAll("[data-toast]").forEach((toast) => {
   window.setTimeout(() => toast.remove(), 3000);
 });
+// Destructive forms confirm here; the CSP blocks inline onsubmit handlers.
+document.querySelectorAll("form[data-confirm]").forEach((form) => {
+  form.addEventListener("submit", (event) => {
+    if (!window.confirm(form.dataset.confirm)) event.preventDefault();
+  });
+});
 // Standard POST forms own every mutation and antiforgery token. No fetch is needed.
 document.querySelectorAll("[data-scan-form]").forEach((form) => {
+  const root = form.querySelector('input[name="Root"]');
+  const picks = Array.from(form.querySelectorAll("[data-scan-folder]"));
+  const normalizeFolder = (value) => value.trim().replace(/\//g, "\\").replace(/\\+$/, "").toLowerCase();
+  const updatePicks = () => {
+    picks.forEach((button) => button.setAttribute("aria-pressed",
+      String(normalizeFolder(button.dataset.scanFolder) === normalizeFolder(root.value))));
+  };
+  picks.forEach((button) => {
+    button.addEventListener("click", () => {
+      if (form.dataset.submitting === "true") return;
+      root.value = button.dataset.scanFolder;
+      root.dispatchEvent(new Event("input", { bubbles: true }));
+      root.dispatchEvent(new Event("change", { bubbles: true }));
+      form.querySelector("[data-folder-selection-status]").textContent = `Selected ${root.value}. Ready to scan.`;
+    });
+  });
+  root.addEventListener("input", updatePicks);
+  root.addEventListener("change", updatePicks);
+  updatePicks();
   form.addEventListener("submit", (event) => {
     if (form.dataset.submitting === "true") { event.preventDefault(); return; }
     const browsing = event.submitter?.hasAttribute("data-browse");
@@ -47,6 +88,42 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
 });
 // Directional keyboard and standard-mapped controller navigation share actions.
 (() => {
+  let keyboardActive = false;
+  let keyboardTarget = null;
+  // Declared here: the keyboard message handler below resets it, and the gamepad
+  // poll further down may never run when the browser exposes no gamepad API.
+  let armed = false;
+  const textField = (el) => el instanceof HTMLElement && !el.readOnly && !el.disabled &&
+    el.matches('textarea, input[type="text"], input[type="search"], input[type="email"], input[type="password"], input[type="url"], input[type="tel"], input:not([type])');
+  const keyboardNotice = (message) => {
+    document.getElementById('keyboard-notice')?.remove();
+    if (!message) return;
+    const notice = document.createElement('div');
+    notice.id = 'keyboard-notice';
+    notice.className = 'notice toast';
+    notice.setAttribute('role', 'status');
+    notice.textContent = message;
+    document.body.append(notice);
+    window.setTimeout(() => notice.remove(), 8000);
+  };
+  const requestKeyboard = () => {
+    if (!textField(document.activeElement) || keyboardActive) return;
+    if (!window.chrome?.webview) { keyboardNotice('The Windows keyboard is available only inside the desktop launcher.'); return; }
+    keyboardTarget = document.activeElement;
+    keyboardActive = true;
+    window.chrome.webview.postMessage('keyboard.show');
+  };
+  window.chrome?.webview?.addEventListener('message', (event) => {
+    const data = event.data;
+    if (data?.type !== 'keyboard') return;
+    keyboardActive = data.state === 'requested' || data.state === 'shown';
+    armed = false;
+    if (data.message) keyboardNotice(data.message);
+    if (data.state === 'hidden' && keyboardTarget?.isConnected) {
+      keyboardTarget.focus({ preventScroll: true });
+      keyboardTarget = null;
+    }
+  });
   const selector = 'a[href], button, input:not([type="hidden"]), select, textarea, summary';
   const visible = (el) => {
     const style = getComputedStyle(el);
@@ -57,7 +134,9 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
     if (!el) return;
     document.body.classList.add('directional-navigation');
     el.focus({ preventScroll: true });
-    el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+    // Navigation focuses the centered Play button, but the entire card must be visible.
+    const scrollTarget = el.closest('.entry-card') || el;
+    scrollTarget.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
   };
   let contentFocus = null;
   const toggleSidebar = () => {
@@ -69,11 +148,27 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
       focus(document.querySelector('.sidebar .nav-link.active') || document.querySelector('.sidebar .nav-link'));
     }
   };
+  // "Add to…" is an inline disclosure inside the card menu; its items are hidden until expanded.
+  const setSubmenu = (trigger, open) => {
+    trigger.setAttribute('aria-expanded', String(open));
+    const list = document.getElementById(trigger.getAttribute('aria-controls'));
+    if (list) list.hidden = !open;
+  };
+  document.querySelectorAll('.submenu-trigger').forEach((trigger) => {
+    trigger.addEventListener('click', () => {
+      const open = trigger.getAttribute('aria-expanded') !== 'true';
+      setSubmenu(trigger, open);
+      if (open && document.body.classList.contains('directional-navigation')) {
+        focus(document.getElementById(trigger.getAttribute('aria-controls'))?.querySelector('.submenu-item'));
+      }
+    });
+  });
   const closeMenus = () => {
     document.querySelectorAll('.overlay-menu.is-open').forEach((menu) => {
       menu.classList.remove('is-open');
       menu.querySelector('.menu-trigger').setAttribute('aria-expanded', 'false');
     });
+    document.querySelectorAll('.submenu-trigger[aria-expanded="true"]').forEach((trigger) => setSubmenu(trigger, false));
   };
   const openMenu = () => {
     const menu = document.activeElement.closest('.entry-card')?.querySelector('.overlay-menu');
@@ -110,11 +205,21 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
     const active = document.activeElement;
     const menu = active.closest('.overlay-menu.is-open');
     if (menu) {
-      const items = Array.from(menu.querySelectorAll('.menu-item')).filter(visible);
+      // Collapsed submenu items are [hidden], so visible() keeps up/down to the expanded list.
+      const items = Array.from(menu.querySelectorAll('.menu-item, .submenu-item')).filter(visible);
       const index = items.indexOf(active);
+      const trigger = active.closest('.menu-submenu')?.querySelector('.submenu-trigger');
       if (direction === 'up' || direction === 'down') {
         focus(items[(index + (direction === 'down' ? 1 : items.length - 1)) % items.length]);
-      } else {
+      } else if (direction === 'right' && active.matches('.submenu-trigger')) {
+        setSubmenu(active, true);
+        focus(document.getElementById(active.getAttribute('aria-controls'))?.querySelector('.submenu-item'));
+      } else if (direction === 'left' && trigger && active !== trigger) {
+        setSubmenu(trigger, false);
+        focus(trigger);
+      } else if (direction === 'left' && active.matches('.submenu-trigger[aria-expanded="true"]')) {
+        setSubmenu(active, false);
+      } else if (direction !== 'right') {
         closeMenus();
         focus(menu.closest('.entry-card').querySelector('.overlay-play button'));
       }
@@ -144,12 +249,18 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
   const activate = () => {
     const active = document.activeElement;
     if (!active.matches(selector) || !visible(active)) { focus(initial()); return; }
-    if (active.matches('input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]), textarea, select')) return;
+    if (textField(active)) { requestKeyboard(); return; }
+    if (active.matches('input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]), select')) return;
     active.click();
   };
   const back = () => {
     const menu = document.querySelector('.overlay-menu.is-open');
-    if (menu) {
+    const trigger = document.activeElement.closest('.menu-submenu')?.querySelector('.submenu-trigger[aria-expanded="true"]');
+    if (menu && trigger) {
+      // Back steps out of the submenu first, then out of the menu.
+      setSubmenu(trigger, false);
+      focus(trigger);
+    } else if (menu) {
       closeMenus();
       focus(menu.closest('.entry-card').querySelector('.overlay-play button'));
     } else {
@@ -159,6 +270,20 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
   };
   document.addEventListener('keydown', (event) => {
     if (event.defaultPrevented || event.isComposing) return;
+    if (event.key === 'F11' && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+      event.preventDefault();
+      if (!event.repeat) window.chrome?.webview?.postMessage('window.fullscreen');
+      return;
+    }
+    if (event.key === 'F2' && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      if (!event.repeat) {
+        if (keyboardActive) window.chrome?.webview?.postMessage('keyboard.hide');
+        else requestKeyboard();
+      }
+      return;
+    }
+    if (keyboardActive) return;
     if (event.key === 'F1' && !event.altKey && !event.ctrlKey && !event.metaKey) {
       event.preventDefault();
       if (!event.repeat) toggleSidebar();
@@ -182,11 +307,10 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
   let previous = new Set();
   let heldDirection = null;
   let nextMove = 0;
-  let armed = false;
   let padIndex = null;
   const poll = (now) => {
     window.requestAnimationFrame(poll);
-    if (document.hidden || !document.hasFocus()) { armed = false; previous.clear(); heldDirection = null; return; }
+    if (keyboardActive || document.hidden || !document.hasFocus()) { armed = false; previous.clear(); heldDirection = null; return; }
     let pad;
     try { pad = Array.from(navigator.getGamepads()).find((p) => p?.connected && p.mapping === 'standard'); }
     catch { return; }

@@ -58,6 +58,27 @@ Share build errors or screenshots/behavior to iterate. Neither these commands no
 - Scans are bounded to 2,000 candidates, 100,000 visited entries, and two minutes. Select a smaller folder if a limit is reached. Results are temporary and expire after 30 minutes or application shutdown.
 - Titles are initially inferred from filenames; metadata matching is not implemented yet.
 
+## Bundled launch groups
+
+In **Edit entry → Bundled launch group**, select up to eight existing library entries to launch alongside that entry. For Eden + BetterJoy, add both to the library, edit Eden, select BetterJoy, and save. Eden's existing Play buttons (including featured and search results) use the bundle; launching BetterJoy independently does not launch Eden unless you explicitly configure that direction too.
+
+- Direct companions start in A–Z order, then the primary entry. Each uses its own saved arguments and working directory. Requests are sent back-to-back; the launcher does not wait for controller initialization or program readiness.
+- A companion `.exe` is skipped when its exact executable path can be confirmed as already running. Detection is best effort; shortcuts, bootstrap launchers, and processes Windows cannot inspect may start again.
+- Companion bundles are not traversed, so circular links cannot cause recursive launches. No programs are automatically closed.
+- All launch files and working directories are checked before sending any launch requests. If Windows rejects a later request, remaining requests stop and the error identifies requests already sent. There is no process rollback.
+- Uncheck a companion and save to unlink it. Removing a library entry removes its incoming/outgoing bundle links, never its local files.
+- Bundle links are persisted by an additive EF migration on startup. This feature and migration are source-reviewed, not yet build/runtime-verified by the assistant.
+
+## Startup and fullscreen
+
+**Settings → Startup & display** has independent, opt-in settings:
+
+- **Start with Windows** registers the current `GameLauncher.exe` in the current user's `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` key as `GameLauncher`. It starts at sign-in, not before login, and requires no administrator privileges. Windows Startup apps can independently disable the registration; the app does not override that choice. Save again after moving the executable, and disable it before deleting a standalone copy. The future installer must remove its own startup registration on uninstall.
+- **Launch in fullscreen** is stored as `LaunchFullscreen` under `HKCU\Software\GameLauncher` and applies on the next app launch. This registry preference is separate from the library data-directory backup. It opens borderless on the current monitor without changing resolution or forcing an always-on-top window.
+- **F11** or the shared top-bar fullscreen button switches temporarily; it does not overwrite the saved launch preference. The top-bar close button or **Alt+F4** exits. Windowed bounds/maximized state are restored when leaving fullscreen within the session.
+
+Source-reviewed only: verify save/reopen, F11/controller access to window controls, startup registration/removal and actual sign-in launch on the owner's machine. No startup registration is made merely by installing these source changes.
+
 ## Data and privacy
 
 Local application data lives under:

@@ -39,7 +39,7 @@ internal static class Program
             var addresses = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()
                 ?? throw new InvalidOperationException("The local server did not report its address.");
             var origin = new Uri(addresses.Addresses.Single());
-            using var window = new LauncherWindow(origin, sessionKey, paths);
+            using var window = new LauncherWindow(origin, sessionKey, paths, server.Services.GetRequiredService<DesktopPreferences>());
             server.Services.GetRequiredService<FolderPicker>().Attach(window);
             Application.Run(window);
         }
@@ -92,7 +92,9 @@ internal static class Program
         builder.Services.AddSingleton(paths);
         builder.Services.AddSingleton<ScannerService>();
         builder.Services.AddSingleton<FolderPicker>();
+        builder.Services.AddSingleton<DesktopPreferences>();
         builder.Services.AddSingleton<LibraryService>();
+        builder.Services.AddSingleton<CollectionService>();
         builder.Services.AddSingleton<CredentialStore>();
         builder.Services.AddHttpClient("sgdb", client =>
         {

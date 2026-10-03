@@ -25,4 +25,5 @@ public sealed class LibraryEntry
 }
 
 public sealed record EntryInput(Guid? Id, string Title, string TargetPath,
-    string? Arguments, string? WorkingDirectory, LibraryCategory Category, bool IsFavorite);
+    string? Arguments, string? WorkingDirectory, LibraryCategory Category, bool IsFavorite,
+    IReadOnlyCollection<Guid> CompanionIds);

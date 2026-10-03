@@ -1,5 +1,5 @@
-// Shared current schema used by the model snapshot and the latest migration's target model.
-// Update this file whenever the model changes, and scaffold a matching migration.
+// Historical artwork schema used by AddArtwork and as the base for BundledLaunchSchema.
+// Keep this target frozen; extend the latest schema and snapshot with new migrations.
 using Microsoft.EntityFrameworkCore;
 
 namespace GameLauncher.Data.Migrations;

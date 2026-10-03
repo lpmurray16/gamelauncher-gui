@@ -1,0 +1,170 @@
+@page
+@model CollectionsModel
+@using GameLauncher.Domain
+@using GameLauncher.Services
+@{
+    ViewData["Title"] = "Collections";
+    ViewData["Section"] = "Collections";
+}
+<a class="back-link" asp-page="/Index" asp-route-category="Games">← Back to Games</a>
+<header class="page-heading">
+    <div>
+        <p class="eyebrow">GAME FILTER SETS</p>
+        <h1>Collections<span class="heading-dot">.</span></h1>
+        <p class="lede">Each collection becomes a tab on the Games dashboard, next to All entries and Favorites.</p>
+    </div>
+</header>
+<div asp-validation-summary="All" class="validation" role="alert"></div>
+
+@if (Model.Collections.Count == 0)
+{
+    <section class="empty-state">
+        <div class="empty-symbol" aria-hidden="true">▦</div>
+        <p class="eyebrow">NO COLLECTIONS YET</p>
+        <h2>Start organizing your way</h2>
+        <p>Create a collection like "Co-op Favorites", "Speedrun Candidates", or "Backlog - This Year". Then choose Add to… on a game card to put it in the set.</p>
+    </section>
+}
+else
+{
+    <div class="collections-list" aria-label="Your collections">
+        @foreach (var collection in Model.Collections)
+        {
+            var entryCount = Model.CollectionCounts.GetValueOrDefault(collection.Id);
+            <article class="collection-card">
+                <div class="collection-header">
+                    <h2>@collection.Name</h2>
+                    <span class="collection-count">@entryCount @(entryCount == 1 ? "entry" : "entries")</span>
+                </div>
+                <div class="collection-actions">
+                    <form method="post" asp-page-handler="Rename" asp-route-id="@collection.Id" asp-route-category="@Model.Category" class="collection-rename">
+                        <label class="sr-only" for="rename-@collection.Id">New name for @collection.Name</label>
+                        <input id="rename-@collection.Id" type="text" name="newName" value="@collection.Name" maxlength="60" required />
+                        <button type="submit" class="button secondary">Rename</button>
+                    </form>
+                    <a class="button secondary" asp-page="/Index" asp-route-category="Games" asp-route-collectionId="@collection.Id">View</a>
+                    <form method="post" asp-page-handler="Delete" asp-route-id="@collection.Id" asp-route-category="@Model.Category" class="delete-form" data-confirm="Delete the collection &quot;@collection.Name&quot;? The games stay in your library.">
+                        <button type="submit" class="button danger">Delete</button>
+                    </form>
+                </div>
+            </article>
+        }
+    </div>
+}
+
+@if (Model.HasError)
+{
+    <section class="panel danger-panel">
+        <h2>Error</h2>
+        <p>@Model.ErrorMessage</p>
+        <a class="button secondary" asp-page="/Collections" asp-route-category="@Model.Category">Try again</a>
+    </section>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <section class="panel success-panel">
+        <p>@Model.SuccessMessage</p>
+    </section>
+}
+
+<form method="post" class="panel editor" data-busy-form data-busy-label="Creating…">
+    <div class="panel-heading"><span class="step-number">01</span><div><h2>Create new collection</h2><p>Give it a short, memorable name.</p></div></div>
+    <div class="field">
+        <label asp-for="NewCollectionName">Collection name <span class="required">*</span></label>
+        <input asp-for="NewCollectionName" placeholder="e.g. Co-op Favorites, Speedruns, 2024 Backlog" maxlength="60" required />
+        <span asp-validation-for="NewCollectionName"></span>
+    </div>
+    <input type="hidden" name="Category" value="@Model.Category" />
+    <div class="form-footer"><button type="submit" class="button primary"><span aria-hidden="true">＋</span> Create collection</button></div>
+</form>
+
+@functions{
+    public class CollectionsModel : UiPageModel
+    {
+        private readonly CollectionService _collections;
+        private readonly LibraryService _library;
+        public CollectionsModel(CollectionService collections, LibraryService library) => (_collections, _library) = (collections, library);
+
+        [BindProperty(SupportsGet = true)] public LibraryCategory Category { get; set; } = LibraryCategory.Games;
+        [BindProperty] public string? NewCollectionName { get; set; }
+        public List<LibraryCollection> Collections { get; private set; } = new();
+        public Dictionary<Guid, int> CollectionCounts { get; private set; } = new();
+        public bool HasError { get; private set; }
+        public string? ErrorMessage { get; private set; }
+        public string? SuccessMessage { get; private set; }
+
+        public async Task OnGetAsync()
+        {
+            Category = SafeCategory(Category);
+            await LoadAsync();
+        }
+
+        public async Task<IActionResult> OnPostAsync()
+        {
+            Category = SafeCategory(Category);
+            if (string.IsNullOrWhiteSpace(NewCollectionName))
+            {
+                HasError = true;
+                ErrorMessage = "Enter a collection name.";
+                await LoadAsync();
+                return Page();
+            }
+            try
+            {
+                await _collections.CreateAsync(NewCollectionName!);
+                TempData["Notice"] = $"Collection \"{NewCollectionName!.Trim()}\" created.";
+                return RedirectToPage(new { category = Category });
+            }
+            catch (Exception ex) when (IsExpected(ex))
+            {
+                HasError = true;
+                ErrorMessage = ex.Message;
+                await LoadAsync();
+                return Page();
+            }
+        }
+
+        public async Task<IActionResult> OnPostDeleteAsync(Guid id)
+        {
+            Category = SafeCategory(Category);
+            try
+            {
+                await _collections.DeleteAsync(id);
+                TempData["Notice"] = "Collection deleted. Entries were not removed from your library.";
+                return RedirectToPage(new { category = Category });
+            }
+            catch (Exception ex) when (IsExpected(ex))
+            {
+                HasError = true;
+                ErrorMessage = ex.Message;
+                await LoadAsync();
+                return Page();
+            }
+        }
+
+        public async Task<IActionResult> OnPostRenameAsync(Guid id, string? newName)
+        {
+            Category = SafeCategory(Category);
+            try
+            {
+                await _collections.RenameAsync(id, newName ?? "");
+                TempData["Notice"] = "Collection renamed.";
+                return RedirectToPage(new { category = Category });
+            }
+            catch (Exception ex) when (IsExpected(ex))
+            {
+                HasError = true;
+                ErrorMessage = ex.Message;
+                await LoadAsync();
+                return Page();
+            }
+        }
+
+        private async Task LoadAsync()
+        {
+            Collections = await _collections.GetAllAsync();
+            CollectionCounts = await _collections.GetEntryCountsAsync();
+        }
+    }
+}

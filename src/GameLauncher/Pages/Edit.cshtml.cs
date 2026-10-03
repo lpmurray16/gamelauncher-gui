@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using GameLauncher.Domain;
@@ -19,30 +20,40 @@ public sealed class EditModel : UiPageModel
     [BindProperty, EnumDataType(typeof(LibraryCategory))] public LibraryCategory Category { get; set; }
     [BindProperty] public bool IsFavorite { get; set; }
     [BindProperty] public bool ConfirmRemoval { get; set; }
+    [BindProperty] public List<Guid> CompanionIds { get; set; } = new();
+    public List<LibraryEntry> CompanionChoices { get; private set; } = new();
+
+    private async Task<IActionResult> EditorPageAsync()
+    {
+        try { CompanionChoices = await _library.GetCompanionChoicesAsync(Id); }
+        catch (Exception error) when (IsExpected(error)) { ShowError(error); }
+        return Page();
+    }
     public async Task<IActionResult> OnGetAsync(Guid? id, LibraryCategory category = LibraryCategory.Games)
     {
         Category = SafeCategory(category);
-        if (id is null) return Page();
+        if (id is null) return await EditorPageAsync();
         try
         {
             var entry = await _library.GetAsync(id.Value);
             if (entry is null) return NotFound();
             Id = entry.Id; Title = entry.Title; TargetPath = entry.TargetPath; Arguments = entry.Arguments;
             WorkingDirectory = entry.WorkingDirectory; Category = entry.Category; IsFavorite = entry.IsFavorite;
+            CompanionIds = await _library.GetCompanionIdsAsync(entry.Id);
         }
         catch (Exception error) when (IsExpected(error)) { ShowError(error); }
-        return Page();
+        return await EditorPageAsync();
     }
     public async Task<IActionResult> OnPostAsync()
     {
-        if (!ModelState.IsValid) return Page();
+        if (!ModelState.IsValid) return await EditorPageAsync();
         try
         {
-            await _library.SaveAsync(new EntryInput(Id, Title, TargetPath, Arguments, WorkingDirectory, Category, IsFavorite));
+            await _library.SaveAsync(new EntryInput(Id, Title, TargetPath, Arguments, WorkingDirectory, Category, IsFavorite, CompanionIds));
             TempData["Notice"] = Id.HasValue ? "Entry updated." : "Entry added to your library.";
             return RedirectToPage("/Index", new { category = Category });
         }
-        catch (Exception error) when (IsExpected(error)) { ShowError(error); return Page(); }
+        catch (Exception error) when (IsExpected(error)) { ShowError(error); return await EditorPageAsync(); }
     }
     public async Task<IActionResult> OnPostDeleteAsync()
     {
@@ -55,11 +66,12 @@ public sealed class EditModel : UiPageModel
             if (entry is null) return NotFound();
             Category = entry.Category; Title = entry.Title; TargetPath = entry.TargetPath;
             Arguments = entry.Arguments; WorkingDirectory = entry.WorkingDirectory; IsFavorite = entry.IsFavorite;
-            if (!ConfirmRemoval) { ModelState.AddModelError(string.Empty, "Confirm that you want to remove this library entry."); return Page(); }
+            CompanionIds = await _library.GetCompanionIdsAsync(entry.Id);
+            if (!ConfirmRemoval) { ModelState.AddModelError(string.Empty, "Confirm that you want to remove this library entry."); return await EditorPageAsync(); }
             await _library.DeleteAsync(Id.Value);
             TempData["Notice"] = "Entry removed. Your local files have not been changed.";
             return RedirectToPage("/Index", new { category = Category });
         }
-        catch (Exception error) when (IsExpected(error)) { ShowError(error); return Page(); }
+        catch (Exception error) when (IsExpected(error)) { ShowError(error); return await EditorPageAsync(); }
     }
 }

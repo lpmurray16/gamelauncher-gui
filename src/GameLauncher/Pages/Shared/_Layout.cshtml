@@ -28,18 +28,36 @@
                     @category
                 </a>
             }
+            <a class="nav-link @(active == "Collections" ? "active" : "")" asp-page="/Collections" aria-current="@(active == "Collections" ? "page" : null)"><span class="nav-icon" aria-hidden="true">⚿</span>Collections</a>
             <a class="nav-link @(active == "Settings" ? "active" : "")" asp-page="/Settings" aria-current="@(active == "Settings" ? "page" : null)"><span class="nav-icon" aria-hidden="true">⚙</span>Settings</a>
         </nav>
         <div class="sidebar-footer"><span class="status-dot"></span> Local by design<small>Your library. Your machine.</small></div>
     </aside>
     <main id="main" class="main" tabindex="-1">
-        <div class="topline"><span>PERSONAL LAUNCHER</span><span class="local-label"><span class="status-dot"></span> ON DEVICE</span></div>
+        <div class="topline">
+            <span>PERSONAL LAUNCHER</span>
+            <form method="get" asp-page="/GlobalSearch" class="global-search" role="search" aria-label="Search all libraries">
+                <label class="sr-only" for="global-search">Search Games, Tools and Emulators</label>
+                <input id="global-search" type="search" name="q" value="@(ViewData["GlobalQuery"] as string)" placeholder="Search all libraries…" maxlength="200" />
+                <button type="submit" aria-label="Search all libraries">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.9-3.9" /></svg>
+                </button>
+            </form>
+            <div class="window-controls" aria-label="Window controls">
+                <button type="button" data-window-fullscreen aria-label="Enter fullscreen (F11)" title="Enter fullscreen (F11)" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /></svg>
+                </button>
+                <button type="button" data-window-close aria-label="Close Game Launcher" title="Close Game Launcher">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+                </button>
+            </div>
+        </div>
         @if (TempData["Notice"] is string notice)
         {
             <div class="notice toast" role="status" data-toast>@notice</div>
         }
         @RenderBody()
-        <p class="navigation-hint">Navigate: arrows / D-pad · Select: Enter / A · Options: Shift+F10 / X · Back: Esc / B · Sidebar: F1 / View · Favorite: Y (controller)</p>
+        <p class="navigation-hint">Navigate: arrows / D-pad · Select: Enter / A · Options: Shift+F10 / X · Back: Esc / B · Sidebar: F1 / View · Favorite: Y (controller) · Windows keyboard: A on a text field / F2 · Fullscreen: F11</p>
         <footer class="page-footer">Less searching. More playing.<span>GAME LAUNCHER / LOCAL LIBRARY</span></footer>
     </main>
 </div>

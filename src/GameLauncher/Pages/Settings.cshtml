@@ -8,15 +8,46 @@
 <div asp-validation-summary="All" class="validation" role="alert"></div>
 
 <section class="panel">
+    <div class="panel-heading"><span class="step-number" aria-hidden="true">↗</span><div><h2>Startup &amp; display</h2><p>Make this your first stop when you sign in, or open straight into a fullscreen library.</p></div></div>
+    <form method="post" asp-page-handler="Startup" data-busy-form data-busy-label="Saving…">
+        <label class="check-label"><input asp-for="StartWithWindows" /> Start with Windows</label>
+        <p class="helper">Register Game Launcher to open when you sign in to this Windows account. No administrator access is needed. Windows Settings → Apps → Startup can still disable it; this checkbox shows registration, not Windows' enabled/disabled override.</p>
+        <p class="helper">This uses the current GameLauncher.exe location. Enable it from your permanent installed copy, not a temporary build folder. If you move the app, save this setting again from its new location. Turn it off before deleting a standalone copy.</p>
+        <button type="submit" class="button secondary">Save startup preference</button>
+    </form>
+    <hr class="settings-divider" />
+    <form method="post" asp-page-handler="Display" data-busy-form data-busy-label="Saving…">
+        <label class="check-label"><input asp-for="LaunchFullscreen" /> Launch in fullscreen</label>
+        <p class="helper">Applies next time the app opens, including Windows startup. Fullscreen fills the current monitor without a title bar or window borders; it does not change your display resolution or stay above other apps.</p>
+        <p class="helper">Press F11 or use the top-bar fullscreen button to switch at any time. That temporary switch does not change this saved preference. The top-bar close button and Alt+F4 still exit the launcher.</p>
+        <button type="submit" class="button secondary">Save display preference</button>
+    </form>
+</section>
+
+<section class="panel">
     <div class="panel-heading"><span class="step-number" aria-hidden="true">⚿</span><div><h2>Artwork provider</h2><p>Artwork is optional. Your key is encrypted for your Windows account on this device and never shown again.</p></div></div>
-    @if (Model.HasSgdbKey)
-    {
-        <p><strong>SteamGridDB:</strong> key saved for this account.</p>
-        <div class="form-footer">
-            <form method="post" asp-page-handler="Check" data-busy-form data-busy-label="Checking…"><button class="button secondary" type="submit">Check connection</button></form>
-            <form method="post" asp-page-handler="Remove"><button class="button danger" type="submit">Remove key</button></form>
+    <div class="provider-status @(Model.HasSgdbKey ? "has-key" : "no-key")">
+        <div class="provider-status-copy">
+            <span class="provider-status-icon" aria-hidden="true">
+                @if (Model.HasSgdbKey)
+                {
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6" /></svg>
+                }
+                else
+                {
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5m0-9v1" /></svg>
+                }
+            </span>
+            <div><span class="provider-status-name">SteamGridDB</span><strong>@(Model.HasSgdbKey ? "API key saved" : "No API key set")</strong><p>@(Model.HasSgdbKey ? "Stored securely for your Windows account. Check the connection to verify it." : "Add a key to search for artwork, or keep using your own local images.")</p></div>
         </div>
-    }
+        @if (Model.HasSgdbKey)
+        {
+            <div class="provider-status-actions">
+                <form method="post" asp-page-handler="Check" data-busy-form data-busy-label="Checking…"><button class="button secondary" type="submit">Check connection</button></form>
+                <form method="post" asp-page-handler="Remove"><button class="button danger" type="submit">Remove key</button></form>
+            </div>
+        }
+    </div>
     <form method="post" asp-page-handler="Save" class="provider-key-form" data-busy-form data-busy-label="Saving…">
         <div class="field">
             <label for="ApiKey">@(Model.HasSgdbKey ? "Replace key" : "SteamGridDB API key")</label>
@@ -29,5 +60,28 @@
     </form>
 </section>
 
-<section class="panel"><div class="panel-heading"><span class="step-number" aria-hidden="true">⌂</span><div><h2>Local storage</h2><p>Your library is stored on this Windows device.</p></div></div><dl class="settings-list"><div><dt>Data directory</dt><dd><code>@Model.DataDirectory</code></dd></div><div><dt>Library database</dt><dd><code>@Model.DatabasePath</code></dd></div><div><dt>Artwork</dt><dd><code>@Model.ArtworkDirectory</code></dd></div></dl><p class="helper">To make a backup, close Game Launcher before copying its data directory. Removing a library entry never removes the executable itself.</p></section>
+<section class="panel">
+    <div class="panel-heading"><span class="step-number" aria-hidden="true">⌂</span><div><h2>Local storage</h2><p>Your library is stored on this Windows device.</p></div></div>
+    <dl class="settings-list">
+        @foreach (var location in new[] {
+            (Id: "data", Label: "Data directory", Path: Model.DataDirectory, Action: "Open data directory in File Explorer"),
+            (Id: "database", Label: "Library database", Path: Model.DatabasePath, Action: "Show library database in File Explorer"),
+            (Id: "artwork", Label: "Artwork", Path: Model.ArtworkDirectory, Action: "Open artwork folder in File Explorer") })
+        {
+            <div>
+                <dt>@location.Label</dt>
+                <dd class="storage-path-row">
+                    <code>@location.Path</code>
+                    <form method="post" asp-page-handler="OpenLocation">
+                        <input type="hidden" name="location" value="@location.Id" />
+                        <button type="submit" class="storage-open-button" aria-label="@location.Action" title="@location.Action">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2M3 7h6l2 3h11l-3 10H3L1 10h3" /></svg>
+                        </button>
+                    </form>
+                </dd>
+            </div>
+        }
+    </dl>
+    <p class="helper">To make a backup, close Game Launcher before copying its data directory. Removing a library entry never removes the executable itself.</p>
+</section>
 <section class="panel"><h2>What this version supports</h2><div class="capability-grid"><div><span class="capability-label">AVAILABLE</span><h3>Your launch files, organized</h3><p>Launch games, emulator executables and tools with custom arguments and working directories. Search, favorite, import from folder scans, and assign covers and background images.</p></div><div><span class="capability-label muted">NOT YET IMPLEMENTED</span><h3>No hidden integrations</h3><p>Metadata descriptions, genres, cloud sync and emulator ROM profiles are not included. Storefront accounts are not connected.</p></div></div></section>

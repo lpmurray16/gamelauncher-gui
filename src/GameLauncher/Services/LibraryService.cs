@@ -10,6 +10,21 @@ namespace GameLauncher.Services;
 public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, ScannerService scanner)
 {
     private readonly SemaphoreSlim _writeGate = new(1, 1);
+    private readonly SemaphoreSlim _launchGate = new(1, 1);
+    public const int MaxCompanions = 8;
+
+    public async Task<List<LibraryEntry>> GetCompanionChoicesAsync(Guid? entryId)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        var entries = await db.Entries.AsNoTracking().Where(x => x.Id != entryId).ToListAsync();
+        return entries.OrderBy(x => x.Title, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Id).ToList();
+    }
+
+    public async Task<List<Guid>> GetCompanionIdsAsync(Guid entryId)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        return await db.LaunchCompanions.Where(x => x.EntryId == entryId).Select(x => x.CompanionId).ToListAsync();
+    }
 
     public async Task<List<LibraryEntry>> GetEntriesAsync(LibraryCategory category, string? search = null)
     {
@@ -19,6 +34,21 @@ public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, 
         if (!string.IsNullOrWhiteSpace(search))
             entries = entries.Where(x => x.Title.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
         return entries.OrderByDescending(x => x.IsFavorite).ThenBy(x => x.Title, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    public async Task<List<LibraryEntry>> SearchAllAsync(string term)
+    {
+        term = term.Trim();
+        if (term.Length == 0) return new();
+        if (term.Length > 200) throw new ArgumentException("Search must be 200 characters or fewer.");
+        await using var db = await factory.CreateDbContextAsync();
+        var entries = await db.Entries.AsNoTracking()
+            .Where(x => x.Category == LibraryCategory.Games || x.Category == LibraryCategory.Tools || x.Category == LibraryCategory.Emulators)
+            .ToListAsync();
+        // Match the category search's case-insensitive Unicode title comparison.
+        return entries.Where(x => x.Title.Contains(term, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(x => x.Title, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.Category).ThenBy(x => x.Id).ToList();
     }
 
     public async Task<LibraryEntry?> GetAsync(Guid id)
@@ -54,6 +84,18 @@ public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, 
                 ? await db.Entries.SingleOrDefaultAsync(x => x.Id == input.Id.Value)
                     ?? throw new InvalidOperationException("This entry no longer exists.")
                 : new LibraryEntry();
+            var companionIds = input.CompanionIds.Distinct().ToList();
+            if (companionIds.Count > MaxCompanions)
+                throw new ArgumentException($"Choose no more than {MaxCompanions} companion entries.");
+            if (companionIds.Contains(entry.Id))
+                throw new ArgumentException("An entry cannot launch itself as a companion.");
+            if (await db.Entries.CountAsync(x => companionIds.Contains(x.Id)) != companionIds.Count)
+                throw new ArgumentException("A selected companion no longer exists. Review the launch group and save again.");
+            var existingCompanions = await db.LaunchCompanions.Where(x => x.EntryId == entry.Id).ToListAsync();
+            db.LaunchCompanions.RemoveRange(existingCompanions.Where(x => !companionIds.Contains(x.CompanionId)));
+            var existingIds = existingCompanions.Select(x => x.CompanionId).ToHashSet();
+            foreach (var companionId in companionIds.Where(x => !existingIds.Contains(x)))
+                db.LaunchCompanions.Add(new LaunchCompanion { EntryId = entry.Id, CompanionId = companionId });
             entry.Title = title;
             entry.TargetPath = path;
             entry.TargetKey = key;
@@ -126,37 +168,120 @@ public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, 
         finally { _writeGate.Release(); }
     }
 
-    public async Task LaunchAsync(Guid id)
+    public async Task<string> LaunchAsync(Guid id)
     {
-        var entry = await GetAsync(id) ?? throw new InvalidOperationException("This entry no longer exists.");
+        if (!await _launchGate.WaitAsync(0))
+            throw new InvalidOperationException("Another launch request is still being sent. Please wait a moment.");
+        try
+        {
+            await using var db = await factory.CreateDbContextAsync();
+            var entry = await db.Entries.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id)
+                ?? throw new InvalidOperationException("This entry no longer exists.");
+            var companionIds = await db.LaunchCompanions.Where(x => x.EntryId == id)
+                .Select(x => x.CompanionId).ToListAsync();
+            if (companionIds.Count > MaxCompanions || companionIds.Contains(id))
+                throw new InvalidOperationException("This launch group is invalid. Edit the entry and save its companions again.");
+            var companions = await db.Entries.AsNoTracking().Where(x => companionIds.Contains(x.Id)).ToListAsync();
+            if (companions.Count != companionIds.Count)
+                throw new InvalidOperationException("A companion no longer exists. Review this entry's launch group.");
+
+            // Direct companions only; never recurse into their bundles, even if links form a cycle.
+            var entries = companions.OrderBy(x => x.Title, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => x.Id).Append(entry).ToList();
+            var plan = new List<(LibraryEntry Entry, ProcessStartInfo StartInfo)>();
+            foreach (var item in entries)
+            {
+                try { plan.Add((item, PrepareLaunch(item))); }
+                catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+                { throw new InvalidOperationException($"Cannot launch {item.Title}: {ex.Message} No launch requests were sent.", ex); }
+            }
+
+            var started = new List<LibraryEntry>();
+            var skipped = new List<string>();
+            string? failure = null;
+            foreach (var item in plan)
+            {
+                if (item.Entry.Id != id && IsExecutableRunning(item.Entry.TargetPath))
+                {
+                    skipped.Add(item.Entry.Title);
+                    continue;
+                }
+                try
+                {
+                    using var process = Process.Start(item.StartInfo);
+                    started.Add(item.Entry);
+                }
+                catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
+                {
+                    failure = $"Windows could not launch {item.Entry.Title}: {ex.Message} Remaining launch requests were not sent.";
+                    break;
+                }
+            }
+
+            var summary = started.Count == 0 ? "No new launch requests were sent."
+                : $"Launch requests sent: {string.Join(", ", started.Select(x => x.Title))}.";
+            if (skipped.Count > 0) summary += $" Already running: {string.Join(", ", skipped)}.";
+            if (started.Count > 0)
+            {
+                await _writeGate.WaitAsync();
+                try
+                {
+                    var startedIds = started.Select(x => x.Id).ToList();
+                    await db.Entries.Where(x => startedIds.Contains(x.Id))
+                        .ExecuteUpdateAsync(updates => updates.SetProperty(x => x.LastLaunchedUtc, (DateTime?)DateTime.UtcNow));
+                }
+                catch (Exception ex) when (ex is DbUpdateException or Microsoft.Data.Sqlite.SqliteException)
+                { throw new InvalidOperationException($"{failure} {summary} Launch history could not be saved: {ex.Message}", ex); }
+                finally { _writeGate.Release(); }
+            }
+            if (failure is not null)
+                throw new InvalidOperationException($"{failure} {summary} Programs already started have not been closed.");
+            return summary;
+        }
+        finally { _launchGate.Release(); }
+    }
+
+    private static ProcessStartInfo PrepareLaunch(LibraryEntry entry)
+    {
         var path = LaunchTarget.Normalize(entry.TargetPath);
         if (!Directory.Exists(entry.WorkingDirectory))
             throw new ArgumentException("The working directory is missing. Edit this entry to locate it.");
         var isExecutable = Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase);
-        var target = Path.GetExtension(path).Equals(".url", StringComparison.OrdinalIgnoreCase)
-            ? LaunchTarget.ReadSteamUrl(path) : path;
+        return new ProcessStartInfo
+        {
+            FileName = Path.GetExtension(path).Equals(".url", StringComparison.OrdinalIgnoreCase)
+                ? LaunchTarget.ReadSteamUrl(path) : path,
+            Arguments = isExecutable ? entry.Arguments : "",
+            WorkingDirectory = entry.WorkingDirectory,
+            UseShellExecute = true
+        };
+    }
+
+    private static bool IsExecutableRunning(string path)
+    {
+        // Shortcuts may start a different process: never guess from their filenames.
+        if (!Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase)) return false;
+        Process[] processes;
+        try { processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(path)); }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or NotSupportedException)
+        { return false; }
         try
         {
-            using var process = Process.Start(new ProcessStartInfo
+            foreach (var process in processes)
             {
-                FileName = target,
-                Arguments = isExecutable ? entry.Arguments : "",
-                WorkingDirectory = entry.WorkingDirectory,
-                UseShellExecute = true
-            });
+                try
+                {
+                    if (!process.HasExited && string.Equals(process.MainModule?.FileName, path, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+                catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or NotSupportedException)
+                {
+                    // Best effort: Windows may deny inspection of elevated processes.
+                }
+            }
+            return false;
         }
-        catch (Win32Exception ex)
-        { throw new InvalidOperationException($"Windows could not launch this entry: {ex.Message}", ex); }
-        await _writeGate.WaitAsync();
-        try
-        {
-            await using var db = await factory.CreateDbContextAsync();
-            await db.Entries.Where(x => x.Id == id)
-                .ExecuteUpdateAsync(updates => updates.SetProperty(x => x.LastLaunchedUtc, (DateTime?)DateTime.UtcNow));
-        }
-        catch (Exception ex) when (ex is DbUpdateException or Microsoft.Data.Sqlite.SqliteException)
-        { throw new InvalidOperationException("The launch request was sent, but its history could not be saved.", ex); }
-        finally { _writeGate.Release(); }
+        finally { foreach (var process in processes) process.Dispose(); }
     }
 
     private static void ValidateCategory(LibraryCategory category)

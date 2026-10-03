@@ -19,6 +19,8 @@ public sealed class ScanModel : UiPageModel
     [BindProperty] public Guid ScanId { get; set; }
     [BindProperty] public List<Guid> SelectedIds { get; set; } = new();
     public ScanResult? Result { get; private set; }
+    private IReadOnlyList<ScanFolderSuggestion>? _suggestedFolders;
+    public IReadOnlyList<ScanFolderSuggestion> SuggestedFolders => _suggestedFolders ??= CommonScanFolders.Discover();
     public void OnGet() => Category = SafeCategory(Category);
     public async Task<IActionResult> OnPostBrowseAsync()
     {
