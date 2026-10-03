@@ -2,7 +2,7 @@
 
 A Windows-first, local-file game launcher built with **C# / .NET 10, Razor Pages, WinForms + WebView2, Entity Framework Core, and SQLite**.
 
-**Status:** first implementation, source-reviewed only. It has not been restored, compiled, launched, visually checked, or packaged by the assistant. The project owner runs builds and application launches. No test suite is included or planned for this workflow.
+**Status:** v1.0.0 Windows x64 Release publish and Inno Setup installer compilation succeeded. The packaged application, installation, upgrade, uninstall, and missing-WebView2 flow still require a manual walkthrough. The project owner normally runs builds and launches; this release packaging was explicitly requested. No test suite is included or planned.
 
 ## First slice
 
@@ -16,14 +16,16 @@ A Windows-first, local-file game launcher built with **C# / .NET 10, Razor Pages
 - Local SQLite persistence with an initial EF Core migration.
 - Dark desktop interface, scan feedback, and transient bottom notifications.
 
-Emulators currently means **emulator executables**, not ROM profiles. Metadata lookup, artwork downloading, saved scan roots, ROM association, and the Inno Setup installer are subsequent milestones. There is no sample library or fabricated artwork.
+Also included: SteamGridDB/local artwork, custom collections, global search, bundled launches, keyboard/controller navigation, fullscreen and optional Windows startup. The header browser shortcut saves a browser executable for this launcher only. Bundled launch options are collapsed by default in Add/Edit entry.
+
+Emulators currently means **emulator executables**, not ROM profiles. Metadata descriptions, saved scan roots, and ROM association remain future work. There is no sample library or fabricated artwork.
 
 ## Build and run — for the project owner
 
 Requirements:
 
 - Windows with the .NET 10 SDK (`global.json` requests 10.0.303 or a newer compatible .NET 10 feature band).
-- Microsoft Edge WebView2 Evergreen Runtime. If missing, this development version displays its official download location; automated prerequisite handling belongs to the installer milestone.
+- Microsoft Edge WebView2 Evergreen Runtime. Development launches report its download location if missing; the release installer handles this prerequisite.
 - Network access for the first NuGet restore, which `dotnet build` performs automatically.
 
 From the repository root:
@@ -46,7 +48,7 @@ The application opens its own desktop window. There is no normal browser URL to 
 5. Launch it, then close and reopen Game Launcher to check persistence.
 6. Try a favorite, a search, and removal. Removal must leave the target file untouched.
 
-Share build errors or screenshots/behavior to iterate. Neither these commands nor the walkthrough has been executed by the assistant.
+Share build errors or screenshots/behavior to iterate. Release publishing has been executed successfully; this manual runtime walkthrough has not been performed by the assistant.
 
 ## Launch target rules
 
@@ -73,7 +75,7 @@ In **Edit entry → Bundled launch group**, select up to eight existing library 
 
 **Settings → Startup & display** has independent, opt-in settings:
 
-- **Start with Windows** registers the current `GameLauncher.exe` in the current user's `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` key as `GameLauncher`. It starts at sign-in, not before login, and requires no administrator privileges. Windows Startup apps can independently disable the registration; the app does not override that choice. Save again after moving the executable, and disable it before deleting a standalone copy. The future installer must remove its own startup registration on uninstall.
+- **Start with Windows** registers the current `GameLauncher.exe` in the current user's `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` key as `GameLauncher`. It starts at sign-in, not before login, and requires no administrator privileges. Windows Startup apps can independently disable the registration; the app does not override that choice. Save again after moving the executable, and disable it before deleting a standalone copy. The installer removes startup registration on uninstall only when it points to that installed copy.
 - **Launch in fullscreen** is stored as `LaunchFullscreen` under `HKCU\Software\GameLauncher` and applies on the next app launch. This registry preference is separate from the library data-directory backup. It opens borderless on the current monitor without changing resolution or forcing an always-on-top window.
 - **F11** or the shared top-bar fullscreen button switches temporarily; it does not overwrite the saved launch preference. The top-bar close button or **Alt+F4** exits. Windowed bounds/maximized state are restored when leaving fullscreen within the session.
 
@@ -112,17 +114,34 @@ src/GameLauncher/
 
 One application project keeps the initial implementation simple. Services are separated from page handlers and the window so they can evolve without coupling game management to the UI.
 
-## Future distribution
+## v1.0 installer
 
-The intended friend-facing artifact is **one setup `.exe`**, created with Inno Setup. Installer implementation, WebView2 prerequisite handling, upgrade/uninstall behavior, and signing remain outstanding.
+Output: `artifacts/installer/GameLauncher-Setup-1.0.0-win-x64.exe`, with a companion `.sha256` checksum file. Only the setup executable is required for distribution.
 
-An initial self-contained Windows x64 publish profile is supplied for later owner-run verification:
+- Windows x64 package; Setup requires Windows 10 22H2 or newer.
+- Per-user installation to `%LOCALAPPDATA%/Programs/GameLauncher`, without requesting administrator rights.
+- Self-contained .NET publish: recipients do not need the .NET SDK or runtime separately. Native dependencies may be extracted at runtime.
+- Start menu shortcut, optional desktop shortcut, and Windows Installed apps uninstaller. Startup at sign-in remains opt-in in the application.
+- A Microsoft-signed WebView2 Evergreen bootstrapper is bundled and run only if the shared runtime is absent. **Internet is required for that step.** Setup rechecks runtime registration before installing the app; a failed prerequisite shows an error and stops installation.
+- Close the launcher before installing/upgrading or uninstalling. A stable installer AppId supports future in-place upgrades; keep it unchanged.
+- Uninstall removes installed files and its matching startup registration, but preserves `%LOCALAPPDATA%/GameLauncher`, browser/display preferences, and the shared WebView2 Runtime. It never removes games or user-selected executables.
+- Third-party dependency notices ship alongside the app. No project license was selected and no private API keys or personal library files are packaged.
+- This release is **unsigned**; Windows may show an unknown-publisher/SmartScreen warning. No signing certificate is configured.
 
-```sh
-dotnet publish src/GameLauncher/GameLauncher.csproj -p:PublishProfile=Windows -o artifacts/publish
+### Rebuild the installer
+
+Prerequisites: .NET 10 SDK and Inno Setup 6 (the first successful build used 6.7.3). From the repository root:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1
 ```
 
-This is a publish command, **not an installer build**. Single-file publishing may extract native dependencies at runtime; writable application data stays external. WebView2 is still required. No distributable or working build is claimed yet.
+The script discovers Inno Setup in standard locations (or accepts `-IsccPath`), cleans only the generated x64 publish directory, publishes Release, verifies the Microsoft signature on the cached/downloaded WebView2 bootstrapper, collects dependency notices, compiles Setup, and writes SHA-256. The project `<Version>` drives the installer version. Build output and prerequisites stay under ignored `artifacts/`.
+
+### Release verification boundary
+
+Verified: Release publish, installer compilation, output version and SHA-256 generation, Microsoft bootstrapper signature. Not yet verified: clean-machine installation, rendered packaged UI, WebView2 installation on a machine without it, upgrade/persistence, startup cleanup, or uninstall. Before broad distribution, run the installer on a clean Windows account/VM, launch it, configure a browser and entry, reinstall to check preservation, then uninstall and confirm the library and game files remain.
+
 
 ## GitHub
 

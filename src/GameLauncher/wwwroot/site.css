@@ -99,6 +99,10 @@
 .navigation-hint{color:var(--muted);font-size:11px;line-height:1.6;margin-top:18px}
 /* Global search remains separate from the category toolbar search. */
 .topline{gap:16px}
+.browser-shortcut{flex-shrink:0;margin:0}
+.browser-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-width:42px;min-height:40px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text);font-size:13px;letter-spacing:normal;white-space:nowrap}
+.browser-button:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.browser-button svg{display:block;flex-shrink:0}
 .global-search{display:flex;align-items:center;gap:8px;width:360px;max-width:100%;margin-left:auto;letter-spacing:normal;font-size:13px}
 .global-search input{min-width:0;flex:1;width:0;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
 .global-search button{width:41px;align-self:stretch;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:9px;background:var(--surface-raised);color:var(--text);padding:0}
@@ -127,6 +131,9 @@
 .sort-chip.selected{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 /* Bundled launch group editor */
 .launch-group{margin-top:28px;padding-top:24px;border-top:1px solid var(--line)}
+.launch-group>summary{cursor:pointer;font-size:17px;font-weight:600;color:var(--text)}
+.launch-group>summary:hover{color:var(--accent)}
+.launch-group[open]>summary{margin-bottom:16px}
 .launch-group>p{color:var(--muted);font-size:13px}
 .launch-companion-options{margin:18px 0;padding:12px;border:1px solid var(--line);border-radius:10px;min-width:0}
 .launch-companion-options legend{padding:0 8px;font-size:13px}

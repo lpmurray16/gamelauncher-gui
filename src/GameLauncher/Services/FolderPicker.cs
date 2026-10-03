@@ -22,6 +22,22 @@ public sealed class FolderPicker
         });
     }
 
+    public Task<string?> PickBrowserAsync()
+    {
+        var owner = OwnerOrThrow();
+        return RunDialog(owner, () =>
+        {
+            using var dialog = new OpenFileDialog
+            {
+                Title = "Choose your browser executable",
+                Filter = "Browser executable (*.exe)|*.exe",
+                CheckFileExists = true,
+                Multiselect = false
+            };
+            return dialog.ShowDialog(owner) == DialogResult.OK ? dialog.FileName : null;
+        });
+    }
+
     public Task<string?> PickImageAsync()
     {
         var owner = OwnerOrThrow();

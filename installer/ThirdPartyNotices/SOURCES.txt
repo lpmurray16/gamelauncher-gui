@@ -1,0 +1,6 @@
+Supplemental dependency licenses (not a license for Game Launcher):
+
+SQLitePCLRaw 2.1.12: https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/v2.1.12/LICENSE.TXT
+EF Core / Microsoft.Data.Sqlite 10.0.12: https://raw.githubusercontent.com/dotnet/efcore/v10.0.12/LICENSE.txt
+
+The build also collects license files, notices and NuGet metadata from the restored packages and .NET runtime packs. Review these notices when updating dependencies.

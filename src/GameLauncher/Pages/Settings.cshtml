@@ -7,6 +7,26 @@
 <header class="page-heading"><div><p class="eyebrow">UNDER THE HOOD</p><h1>Settings<span class="heading-dot">.</span></h1><p class="lede">A local library, without the extra noise.</p></div></header>
 <div asp-validation-summary="All" class="validation" role="alert"></div>
 
+<section class="panel" id="browser">
+    <div class="panel-heading"><span class="step-number" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="4" ry="9" /><path d="M3 12h18" /></svg></span><div><h2>Browser shortcut</h2><p>Open your browser from the globe button on any page.</p></div></div>
+    @if (!string.IsNullOrWhiteSpace(Model.BrowserExecutable))
+    {
+        <dl class="settings-list"><div><dt>Browser executable</dt><dd class="storage-path-row"><code>@Model.BrowserExecutable</code></dd></div></dl>
+    }
+    else
+    {
+        <p class="helper">No browser selected. Choose your browser's .exe to enable the header shortcut.</p>
+    }
+    <div class="actions">
+        <form method="post" asp-page-handler="ChooseBrowser" data-busy-form data-busy-label="Choosing…"><button type="submit" class="button secondary">@(string.IsNullOrWhiteSpace(Model.BrowserExecutable) ? "Choose browser…" : "Change browser…")</button></form>
+        @if (!string.IsNullOrWhiteSpace(Model.BrowserExecutable))
+        {
+            <form method="post" asp-page-handler="ClearBrowser"><button type="submit" class="button danger">Clear selection</button></form>
+        }
+    </div>
+    <p class="helper">Saved for this launcher only; your Windows default browser is unchanged. Clearing this selection does not delete or uninstall your browser.</p>
+</section>
+
 <section class="panel">
     <div class="panel-heading"><span class="step-number" aria-hidden="true">↗</span><div><h2>Startup &amp; display</h2><p>Make this your first stop when you sign in, or open straight into a fullscreen library.</p></div></div>
     <form method="post" asp-page-handler="Startup" data-busy-form data-busy-label="Saving…">

@@ -1,0 +1,18 @@
+Game Launcher 1.0
+
+A local launcher for your games, emulators, and tools.
+
+Setup installs for your Windows account only. No separate .NET installation is needed.
+Windows 10 22H2 or newer is required; this package contains the Windows x64 application.
+
+If Microsoft Edge WebView2 Runtime is missing, Setup installs it using Microsoft's bundled bootstrapper. Internet access is required for that step. If it cannot be installed, Setup stops with an error rather than leaving you with an unusable launcher.
+
+Your library, artwork, and other local data are stored in:
+%LOCALAPPDATA%\GameLauncher
+
+Upgrades and uninstall preserve that data and your browser/display preferences. Uninstall does not remove any games, browsers, tools, or the shared WebView2 Runtime. It removes this installed copy's Windows startup registration if you enabled it in Settings.
+
+Startup at sign-in is opt-in in Settings. The installer does not enable it.
+No storefront accounts or private API keys are bundled. Artwork search requires your own optional SteamGridDB API key; local artwork can be used without one.
+
+This release is unsigned. Windows may show an unknown-publisher or SmartScreen warning. Install only a copy obtained from a source you trust.

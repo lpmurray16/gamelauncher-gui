@@ -14,8 +14,8 @@
     <div class="field"><label asp-for="TargetPath">Launch file path <span class="required">*</span></label><input asp-for="TargetPath" placeholder="C:\Games\MyGame\game.exe" required spellcheck="false" /><span asp-validation-for="TargetPath"></span><small>Use the full path to a trusted .exe, .lnk, or Steam game .url shortcut. Windows shortcuts can run programs with their own arguments; only add shortcuts you trust.</small></div>
     <div class="form-grid"><div class="field"><label asp-for="Arguments">Launch arguments <span class="optional">optional</span></label><input asp-for="Arguments" spellcheck="false" placeholder="Additional command-line options" /><small>Custom arguments apply to .exe files. Shortcuts keep their own arguments.</small></div><div class="field"><label asp-for="WorkingDirectory">Working directory <span class="optional">optional</span></label><input asp-for="WorkingDirectory" spellcheck="false" placeholder="Default: executable folder" /></div></div>
     <label class="check-label"><input asp-for="IsFavorite" /> Keep this entry in favorites</label>
-    <section class="launch-group" aria-labelledby="launch-group-heading">
-        <h2 id="launch-group-heading">Bundled launch group</h2>
+    <details class="launch-group">
+        <summary>Bundled launch group</summary>
         <p>Launch alongside this entry. For example, select BetterJoy here when editing Eden. Add companion programs to your library first; they can be in any category.</p>
         @if (Model.CompanionChoices.Count == 0)
         {
@@ -33,7 +33,7 @@
         }
         <p class="launch-group-note">Selected companions start first in A–Z order using their own saved settings, followed immediately by this entry. This does not wait for companions to finish initializing. Their own bundles are not followed, and nothing closes automatically.</p>
         <p class="launch-group-note">Companion .exe files are skipped when the same executable is already running. Detection is best effort: shortcuts and processes Windows cannot inspect may launch again. Uncheck companions to unlink them; removing an entry also removes its bundle links, never its files.</p>
-    </section>
+    </details>
     <div class="form-footer"><a class="button secondary" asp-page="/Index" asp-route-category="@Model.Category">Cancel</a><button type="submit" class="button primary">@(Model.Id.HasValue ? "Save changes" : "Add to library") <span aria-hidden="true">↗</span></button></div>
 </form>
 @if (Model.Id.HasValue)

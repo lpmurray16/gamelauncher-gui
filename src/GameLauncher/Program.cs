@@ -93,6 +93,7 @@ internal static class Program
         builder.Services.AddSingleton<ScannerService>();
         builder.Services.AddSingleton<FolderPicker>();
         builder.Services.AddSingleton<DesktopPreferences>();
+        builder.Services.AddSingleton<BrowserLauncher>();
         builder.Services.AddSingleton<LibraryService>();
         builder.Services.AddSingleton<CollectionService>();
         builder.Services.AddSingleton<CredentialStore>();

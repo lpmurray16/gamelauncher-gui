@@ -1,5 +1,11 @@
+@inject GameLauncher.Services.BrowserLauncher Browser
 @{
     var active = ViewData["Section"] as string ?? "Games";
+    var hasBrowser = false;
+    string? browserError = null;
+    try { hasBrowser = !string.IsNullOrWhiteSpace(Browser.ExecutablePath); }
+    catch (Exception error) when (error is InvalidOperationException or System.IO.IOException or UnauthorizedAccessException)
+    { browserError = error.Message; }
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -35,7 +41,23 @@
     </aside>
     <main id="main" class="main" tabindex="-1">
         <div class="topline">
-            <span>PERSONAL LAUNCHER</span>
+            @if (browserError is not null)
+            {
+                <a class="browser-button" asp-page="/Settings" asp-fragment="browser" title="@browserError">Setup browser</a>
+            }
+            else
+            {
+                <form method="post" asp-page="/Settings" asp-page-handler="@(hasBrowser ? "LaunchBrowser" : "ChooseBrowser")" class="browser-shortcut" data-busy-form data-busy-label="@(hasBrowser ? "Opening…" : "Choosing…")">
+                    <input type="hidden" name="returnUrl" value="@(Context.Request.PathBase.ToString() + Context.Request.Path.ToString() + Context.Request.QueryString.ToString())" />
+                    <button type="submit" class="browser-button" aria-label="@(hasBrowser ? "Launch browser" : "Setup browser")" title="@(hasBrowser ? "Launch browser · Change in Settings" : "Choose your browser executable")">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="4" ry="9" /><path d="M3 12h18" /></svg>
+                        @if (!hasBrowser)
+                        {
+                            <span>Setup browser</span>
+                        }
+                    </button>
+                </form>
+            }
             <form method="get" asp-page="/GlobalSearch" class="global-search" role="search" aria-label="Search all libraries">
                 <label class="sr-only" for="global-search">Search Games, Tools and Emulators</label>
                 <input id="global-search" type="search" name="q" value="@(ViewData["GlobalQuery"] as string)" placeholder="Search all libraries…" maxlength="200" />
