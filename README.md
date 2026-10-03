@@ -35,6 +35,13 @@ dotnet build GameLauncher.slnx
 dotnet run --project src/GameLauncher/GameLauncher.csproj --no-build
 ```
 
+For double-click shortcuts, use the batch files in the repository root:
+
+- **RunBuild.bat** — builds the Debug configuration and keeps the console open so you can read the result.
+- **RunLocalProj.bat** — launches the existing Debug executable without building or restoring. Run RunBuild first if no build exists or you want to include source changes.
+
+Both scripts resolve paths relative to their own location, so they can also be called from another working directory.
+
 Alternatively, open the solution in a .NET-10-capable IDE and select GameLauncher as the startup project.
 
 The application opens its own desktop window. There is no normal browser URL to use: the embedded server is bound to a random loopback port and only requests authenticated by the desktop shell are accepted.

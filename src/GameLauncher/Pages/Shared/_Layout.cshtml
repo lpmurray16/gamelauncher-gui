@@ -51,10 +51,7 @@
                     <input type="hidden" name="returnUrl" value="@(Context.Request.PathBase.ToString() + Context.Request.Path.ToString() + Context.Request.QueryString.ToString())" />
                     <button type="submit" class="browser-button" aria-label="@(hasBrowser ? "Launch browser" : "Setup browser")" title="@(hasBrowser ? "Launch browser · Change in Settings" : "Choose your browser executable")">
                         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="4" ry="9" /><path d="M3 12h18" /></svg>
-                        @if (!hasBrowser)
-                        {
-                            <span>Setup browser</span>
-                        }
+                        <span>@(hasBrowser ? "Browser" : "Setup browser")</span>
                     </button>
                 </form>
             }
@@ -79,7 +76,7 @@
             <div class="notice toast" role="status" data-toast>@notice</div>
         }
         @RenderBody()
-        <p class="navigation-hint">Navigate: arrows / D-pad · Select: Enter / A · Options: Shift+F10 / X · Back: Esc / B · Sidebar: F1 / View · Favorite: Y (controller) · Windows keyboard: A on a text field / F2 · Fullscreen: F11</p>
+        <p class="navigation-hint">Navigate: arrows / D-pad · Select: Enter / A · Options: Shift+F10 / X · Back: Esc / B · Sidebar: F1 / View · Jump to top / bottom: LB / RB · Favorite: Y (controller) · Windows keyboard: A on a text field / F2 · Fullscreen: F11</p>
         <footer class="page-footer">Less searching. More playing.<span>GAME LAUNCHER / LOCAL LIBRARY</span></footer>
     </main>
 </div>

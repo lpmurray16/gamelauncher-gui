@@ -241,6 +241,22 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
   });
   const initial = () => document.querySelector('.entry-card .overlay-play button') ||
     candidates().find((el) => el.closest('main')) || candidates()[0];
+  const jumpToEdge = (bottom) => {
+    closeMenus();
+    const controls = candidates().filter((el) => el.closest('main'));
+    const target = bottom ? controls[controls.length - 1] : controls[0];
+    if (target) {
+      document.body.classList.add('directional-navigation');
+      // Move focus without the usual nearest-card scroll fighting the page jump.
+      target.focus({ preventScroll: true });
+      contentFocus = target;
+    }
+    window.scrollTo({
+      left: window.scrollX,
+      top: bottom ? document.documentElement.scrollHeight : 0,
+      behavior: 'instant'
+    });
+  };
   const move = (direction) => {
     const active = document.activeElement;
     const menu = active.closest('.overlay-menu.is-open');
@@ -367,6 +383,17 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
       armed = pressed.size === 0 && !direction;
       previous = pressed;
       heldDirection = null;
+      return;
+    }
+    // Standard-mapped shoulders: LB = top, RB = bottom, once per press.
+    const jumpTop = pressed.has(4) && !previous.has(4);
+    const jumpBottom = pressed.has(5) && !previous.has(5);
+    if (jumpTop || jumpBottom) {
+      jumpToEdge(!jumpTop);
+      heldDirection = direction;
+      nextMove = now + 350;
+      // Do not also activate a newly focused control on the same frame.
+      previous = pressed;
       return;
     }
     if (direction && (direction !== heldDirection || now >= nextMove)) {

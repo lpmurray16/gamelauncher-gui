@@ -29,7 +29,7 @@
         <div class="hero-content">
             <p class="eyebrow">@(featured.LastLaunchedUtc.HasValue ? "JUMP BACK IN" : Model.FeaturedIsFavorite ? "FROM YOUR FAVORITES" : "FEATURED")</p>
             <h2>@featured.Title</h2>
-            @if (featured.LastLaunchedUtc.HasValue) { <p class="hero-meta">Last launched @featured.LastLaunchedUtc.Value.ToLocalTime().ToString("MMM d · HH:mm")</p> }
+            <p class="hero-meta">@(featured.LastLaunchedUtc.HasValue ? $"Last launched {featured.LastLaunchedUtc.Value.ToLocalTime():MMM d · HH:mm}" : "Ready for your first launch")</p>
             <form method="post" asp-page-handler="Launch" asp-route-category="@Model.Category" asp-route-collectionId="@Model.CollectionId" asp-route-search="@Model.Search" asp-route-sort="@Model.Sort" asp-route-favorites="@Model.Favorites" data-busy-form data-busy-label="Launching…">
                 <input type="hidden" name="id" value="@featured.Id" />
                 <button class="button launch hero-launch" type="submit"><span aria-hidden="true">▶</span> Play</button>

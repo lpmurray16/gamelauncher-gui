@@ -29,10 +29,10 @@
 .hero-banner{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:var(--radius);min-height:190px;margin-bottom:34px;background:var(--surface);display:flex;align-items:flex-end}
 .hero-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.92)}
 .hero-banner::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#0c0d0ff2 8%,#0c0d0fcc 38%,#0c0d0f66 72%,#0c0d0f22)}
-.hero-content{position:relative;z-index:2;padding:34px 38px;max-width:560px}
-.hero-content h2{font-size:clamp(1.7rem,3vw,2.5rem);margin-bottom:8px}
+.hero-content{position:relative;z-index:2;padding:34px 38px;flex:1;min-width:0}
+.hero-content h2{font-size:clamp(1.7rem,3vw,2.5rem);margin-bottom:8px;overflow-wrap:anywhere}
 .hero-meta{color:var(--muted);font-size:12.5px;margin-bottom:20px}
-.hero-launch{font-size:15px;padding:12px 30px}
+.hero-launch{font-size:15px;padding:12px 30px;max-width:500px}
 .hero-side{position:relative;z-index:2;margin-left:auto;padding:34px 38px;text-align:right;display:grid;gap:6px}
 .hero-side-label{font-size:9px;letter-spacing:2px;color:var(--muted)}
 .hero-side-title{font-weight:600;max-width:260px}
