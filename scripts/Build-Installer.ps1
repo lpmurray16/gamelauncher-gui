@@ -52,7 +52,7 @@ try {
     # Retain upstream license/notice files and package metadata, not a license for this project.
     $assets = Get-Content (Join-Path $root 'src\GameLauncher\obj\project.assets.json') -Raw | ConvertFrom-Json
     $packageRoots = @($assets.packageFolders.PSObject.Properties.Name)
-    $packagePaths = @($assets.libraries.PSObject.Properties | ForEach-Object { $_.Value.path })
+    $packagePaths = @($assets.libraries.PSObject.Properties | Where-Object { $_.Value.type -eq 'package' } | ForEach-Object { $_.Value.path })
     foreach ($framework in $assets.project.frameworks.PSObject.Properties) {
         foreach ($dependency in $framework.Value.downloadDependencies) {
             $runtimeVersion = ($dependency.version.Trim('[', ']') -split ',')[0].Trim()

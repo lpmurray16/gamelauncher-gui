@@ -15,6 +15,7 @@ public sealed class EditModel : UiPageModel
     [BindProperty] public Guid? Id { get; set; }
     [BindProperty, Required, StringLength(200)] public string Title { get; set; } = "";
     [BindProperty, Required, Display(Name = "Executable path")] public string TargetPath { get; set; } = "";
+    [BindProperty] public string? TrackingExecutablePath { get; set; }
     [BindProperty] public string? Arguments { get; set; }
     [BindProperty] public string? WorkingDirectory { get; set; }
     [BindProperty, EnumDataType(typeof(LibraryCategory))] public LibraryCategory Category { get; set; }
@@ -39,6 +40,7 @@ public sealed class EditModel : UiPageModel
             if (entry is null) return NotFound();
             Id = entry.Id; Title = entry.Title; TargetPath = entry.TargetPath; Arguments = entry.Arguments;
             WorkingDirectory = entry.WorkingDirectory; Category = entry.Category; IsFavorite = entry.IsFavorite;
+            TrackingExecutablePath = entry.TrackingExecutablePath;
             CompanionIds = await _library.GetCompanionIdsAsync(entry.Id);
         }
         catch (Exception error) when (IsExpected(error)) { ShowError(error); }
@@ -49,7 +51,7 @@ public sealed class EditModel : UiPageModel
         if (!ModelState.IsValid) return await EditorPageAsync();
         try
         {
-            await _library.SaveAsync(new EntryInput(Id, Title, TargetPath, Arguments, WorkingDirectory, Category, IsFavorite, CompanionIds));
+            await _library.SaveAsync(new EntryInput(Id, Title, TargetPath, Arguments, WorkingDirectory, Category, IsFavorite, CompanionIds, TrackingExecutablePath));
             TempData["Notice"] = Id.HasValue ? "Entry updated." : "Entry added to your library.";
             return RedirectToPage("/Index", new { category = Category });
         }
@@ -66,6 +68,7 @@ public sealed class EditModel : UiPageModel
             if (entry is null) return NotFound();
             Category = entry.Category; Title = entry.Title; TargetPath = entry.TargetPath;
             Arguments = entry.Arguments; WorkingDirectory = entry.WorkingDirectory; IsFavorite = entry.IsFavorite;
+            TrackingExecutablePath = entry.TrackingExecutablePath;
             CompanionIds = await _library.GetCompanionIdsAsync(entry.Id);
             if (!ConfirmRemoval) { ModelState.AddModelError(string.Empty, "Confirm that you want to remove this library entry."); return await EditorPageAsync(); }
             await _library.DeleteAsync(Id.Value);

@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GameLauncher.Services;
 
-public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, ScannerService scanner)
+public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, ScannerService scanner, GameStatusMonitor statusMonitor)
 {
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly SemaphoreSlim _launchGate = new(1, 1);
@@ -63,6 +63,7 @@ public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, 
         var title = input.Title?.Trim() ?? "";
         if (title.Length is 0 or > 200) throw new ArgumentException("Enter a title between 1 and 200 characters.");
         var path = LaunchTarget.Normalize(input.TargetPath);
+        var trackingPath = ValidateTrackingPath(input.TrackingExecutablePath);
         var arguments = input.Arguments ?? "";
         if (arguments.Length > 8192 || arguments.Contains('\0')) throw new ArgumentException("Launch arguments are invalid or too long.");
         if (arguments.Length > 0 && !Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase))
@@ -99,6 +100,7 @@ public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, 
             entry.Title = title;
             entry.TargetPath = path;
             entry.TargetKey = key;
+            entry.TrackingExecutablePath = trackingPath;
             entry.Arguments = arguments;
             entry.WorkingDirectory = directory;
             entry.Category = input.Category;
@@ -210,6 +212,7 @@ public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, 
                 {
                     using var process = Process.Start(item.StartInfo);
                     started.Add(item.Entry);
+                    if (GameStatusMonitor.CanTrack(item.Entry)) statusMonitor.MarkStarting(item.Entry.Id);
                 }
                 catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
                 {
@@ -282,6 +285,20 @@ public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, 
             return false;
         }
         finally { foreach (var process in processes) process.Dispose(); }
+    }
+
+    private static string? ValidateTrackingPath(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var path = value.Trim();
+        if (path.Length > 32767 || !Path.IsPathFullyQualified(path))
+            throw new ArgumentException("The status tracking path must be an absolute .exe path on a local drive.");
+        path = Path.GetFullPath(path);
+        if (path.StartsWith(@"\\", StringComparison.Ordinal) || path.IndexOf(':', 2) >= 0
+            || !Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("The status tracking path must be an absolute .exe path on a local drive.");
+        if (!File.Exists(path)) throw new ArgumentException("The status tracking executable does not exist.");
+        return path;
     }
 
     private static void ValidateCategory(LibraryCategory category)

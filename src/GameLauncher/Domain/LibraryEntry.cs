@@ -10,6 +10,7 @@ public sealed class LibraryEntry
     public string Title { get; set; } = "";
     public string TargetPath { get; set; } = "";
     public string TargetKey { get; set; } = "";
+    public string? TrackingExecutablePath { get; set; }
     public string Arguments { get; set; } = "";
     public string WorkingDirectory { get; set; } = "";
     public LibraryCategory Category { get; set; }
@@ -26,4 +27,4 @@ public sealed class LibraryEntry
 
 public sealed record EntryInput(Guid? Id, string Title, string TargetPath,
     string? Arguments, string? WorkingDirectory, LibraryCategory Category, bool IsFavorite,
-    IReadOnlyCollection<Guid> CompanionIds);
+    IReadOnlyCollection<Guid> CompanionIds, string? TrackingExecutablePath = null);

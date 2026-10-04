@@ -18,6 +18,7 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
         entry.Property(x => x.Title).HasMaxLength(200).IsRequired();
         entry.Property(x => x.TargetPath).HasMaxLength(32767).IsRequired();
         entry.Property(x => x.TargetKey).HasMaxLength(32767).IsRequired();
+        entry.Property(x => x.TrackingExecutablePath).HasMaxLength(32767);
         entry.Property(x => x.Arguments).HasMaxLength(8192).IsRequired();
         entry.Property(x => x.WorkingDirectory).HasMaxLength(32767).IsRequired();
         entry.Property(x => x.CoverImageFile).HasMaxLength(512);

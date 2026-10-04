@@ -1,0 +1,79 @@
+# Game Launcher — Android companion
+
+Native Kotlin / Jetpack Compose manual-pairing MVP. Open **this directory** in Android Studio; it is a separate Gradle project, not a .NET solution project. There is no fake library, bundled credential, discovery service, or test scaffold.
+
+## Toolchain (owner-run only)
+
+- Android SDK Platform **36**, minimum device Android **8.0 / API 26**.
+- Android Gradle Plugin **8.13.2**, Gradle **8.13**, Kotlin + Compose compiler plugin **2.3.10**; Java/Kotlin bytecode target **17**.
+- **Gradle JDK must be 17–23** (Android Studio → Settings → Build, Execution, Deployment → Build Tools → Gradle → Gradle JDK). JetBrains Runtime 21 (e.g. `~/.jdks/jbr-21.x`) works; bytecode still targets 17 because no toolchain is pinned. For terminal builds, set `JAVA_HOME` to such a JDK first. Java 8 is too old for AGP, and JDK 24+ (including a bundled JDK 25) is **incompatible with this pinned Gradle 8.13**. JDK installation/configuration is left to the owner; nothing was installed here.
+- SDK Build Tools 35.0.0 is AGP's default. Configure `sdk.dir` in your untracked `local.properties` if Studio does not find the SDK.
+- When ready, owner may run `gradlew.bat assembleDebug` from this directory. APK: `app/build/outputs/apk/debug/app-debug.apk`. This command has **not** been run. Opening/syncing in Studio can download dependencies; no sync, restore, build, test, emulator, or app execution was performed during implementation.
+
+The genuine `gradlew`, `gradlew.bat`, and wrapper JAR were downloaded from Gradle's **v8.13.0** source tag. Wrapper JAR SHA-256 was matched against Gradle's published checksum:
+
+`81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f`
+
+The distribution SHA-256 is pinned in `gradle-wrapper.properties`. The Gradle distribution itself was not downloaded/executed.
+
+### Physical phone workflow (owner action)
+
+After selecting JDK 17 and SDK 36, connect your already-authorized Android phone by USB, select it in Android Studio's device selector, and use Run for the `app` configuration. Alternatively, install the owner-built debug APK using your normal trusted installation workflow. Keep the phone and PC on the same private network: USB debugging does not route companion traffic, and `127.0.0.1` on the phone means the phone, not Windows. Avoid guest Wi-Fi/client isolation. The assistant has not invoked Gradle, Android Studio sync, ADB, installation, or launch. Repeat the source-review checklist below on that physical phone before treating this as verified.
+
+## Pair and use
+
+1. On each Windows PC, open **Settings → Manage companion access**, enable LAN access, save, and restart the Windows launcher. Keep it running. Select the displayed IPv4 address on the phone's trusted Wi-Fi/LAN (not a VPN/virtual adapter). Generate an 8-digit code; it expires after two minutes and is consumed after success or five failed attempts. Windows defaults to port 5180, but always enter the actual port shown. See [the parent setup/firewall guide](../../docs/companion.md); do not disable Windows Firewall.
+2. On Android, choose **Add PC**. Enter just the host/IPv4 and the port displayed by Windows (no assumed port), then the code. Confirm the trusted-network warning.
+3. Each paired PC has its own connection, retry loop, library, and status. Tap a PC chip or swipe horizontally; its two-column cover grid scrolls vertically inside the pager.
+4. **Connected** requires a matching device identity, successful authenticated REST, a connected SignalR hub, and a fresh REST snapshot after hub startup. Running games sort first and show a green **Playing** badge; Starting/Stopping show an orange **Starting…/Closing…** badge. `Stopped` only means "not running", so it is deliberately not labelled. Untrackable entries simply never show a badge (`canTrackStatus` is still parsed but not displayed).
+5. Launch sends one request and shows the server message. No stop control is provided. The client does not invent a Running status after launch. A lost response warns that the game may already have launched; POSTs are not automatically retried.
+6. **Reconnect** restarts one PC's session. Failures retry independently with exponential delay (roughly 1–30 seconds plus jitter). Returning to the app rechecks identity, reconnects, and refreshes each PC. Sessions stop while the Activity is paused; this is not a background control service.
+7. Library edits refresh every 30 seconds while connected. Status events received during each GET are buffered and replayed over the REST snapshot, with per-game revision filtering within each hub connection. Epoch and connection guards discard obsolete callbacks. `LibraryChanged` is not required/used.
+8. Offline PCs retain their last in-memory library with launch disabled and “Was playing” rather than a claim of live status. Library/covers are not persisted to disk. Covers load using the authenticated REST client and show a title placeholder if absent/unavailable.
+9. **Remove** forgets that phone's connection/token only; it never deletes games. It does not revoke the token on Windows. Use the PC's token-revocation control when needed. Re-pairing the same device replaces the local connection; pairing a different device adds another page.
+
+## LAN and credential boundary
+
+This MVP is **HTTP on a trusted private LAN only**. Cleartext is explicitly enabled only in this Android app's manifest because arbitrary user-entered LAN hosts cannot be enumerated in a static domain allowlist. This setting permits cleartext at the platform level; application validation narrows every actual endpoint:
+
+- Input permits only a simple hostname or IPv4 plus a separate valid port, never a URL, userinfo, path, fragment, or query.
+- DNS results are filtered to private IPv4 (10/8, 172.16/12, 192.168/16), link-local (169.254/16), or loopback (127/8). IPv6/public-internet endpoints are not supported. A local result is pinned as the connection's literal IPv4 for REST and WebSocket; DNS changes are reconsidered only on reconnect.
+- `/api/device` is fetched **without a token** and its GUID/protocol checked before sending any saved bearer token. A different identity blocks the connection until the user removes/re-pairs it.
+- REST and WebSocket disable redirects and proxies. SignalR uses direct WebSockets with negotiation skipped, so negotiate JSON cannot redirect the token to another host. No Azure SignalR/transport fallback support is intended.
+- Covers must match `/api/games/{same-game-id}/cover` with an optional simple `?v=` cache version. Remote cover URLs cannot receive credentials. Responses have an 8 MiB limit and image decoding is downsampled.
+- Tokens are held only in memory or inside an AES-GCM-encrypted saved-PC document. The randomly generated key is Android Keystore-backed, ciphertext uses random IVs and authenticated context, and backup/device transfer is excluded. Encryption failure is shown, never downgraded to plaintext. A reset action handles damaged data or invalidated keys by removing local ciphertext/key; all PCs must then be paired again.
+
+**Residual risk:** unauthenticated HTTP device identity is not cryptographic authentication. A malicious LAN participant can impersonate an ID, intercept a pairing code or bearer token, or alter traffic. Android Keystore protects tokens at rest, not on the wire. Never expose/forward the port to the internet, never use this over public/untrusted Wi-Fi, and do not interpret local-IP filtering as protection against a compromised LAN/router. TLS plus certificate pinning would be a separate future protocol change.
+
+## Source map
+
+- `Protocol.kt`: wire DTOs/JSON, strict GUID/host validation, pinned LAN client, cancellable bounded HTTP.
+- `PcStore.kt`: Android Keystore AES-GCM persistence and reset.
+- `PcSession.kt`: independent SignalR Java client, retry/lifecycle, REST-event merge, launch/cover requests.
+- `CompanionModel.kt`: paired-PC collection, serialized persistence, pairing/removal/lifecycle.
+- `MainActivity.kt`: Compose onboarding, pairing dialog, PC pager, two-column grids, connection/status controls.
+- `Theme.kt`: Material 3 dark scheme mirroring the Windows `site.css` palette (`#101113` background, `#FF8A47` accent, soft `.launch` buttons, success-panel green for Playing).
+- `res/mipmap-*`: adaptive launcher icon (rocket launchpad) with background `#070708`, a transparent foreground and an Android 13+ themed monochrome layer; `drawable-nodpi/brand_mark.png` is the same artwork for in-app use. `app/src/main/ic_launcher-playstore.png` is the 512px source copy and is not packaged.
+
+## Dependency/API verification
+
+Pinned direct versions were checked by retrieving their POMs from **Google Maven** (`https://dl.google.com/dl/android/maven2/`) or **Maven Central** (`https://repo.maven.apache.org/maven2/`): AGP 8.13.2; Kotlin/Compose plugins 2.3.10; Compose BOM 2025.10.00; Activity Compose 1.11.0; Lifecycle runtime-compose/viewmodel-ktx 2.9.4; Coroutines Android 1.10.2; SignalR 10.0.0; OkHttp 4.12.0. Compose UI, Foundation and Material3 are versioned by the verified BOM, not independently guessed.
+
+Compatibility and client API references:
+
+- [AGP 8.13 compatibility, including JDK 17, Gradle 8.13, API 36 support, and 8.13.2 Kotlin 2.3 support](https://developer.android.com/build/releases/agp-8-13-0-release-notes)
+- [Gradle 8.13 Java compatibility: JDK 24+ unsupported](https://docs.gradle.org/8.13/userguide/compatibility.html)
+- [Kotlin Gradle plugin compatibility](https://kotlinlang.org/docs/gradle-configure-project.html): 2.3.10 covers Gradle 8.13 / AGP 8.13.2.
+- [Microsoft SignalR Java overview](https://learn.microsoft.com/en-us/aspnet/core/signalr/java-client?view=aspnetcore-10.0)
+- [Exact v10.0.0 builder source](https://github.com/dotnet/aspnetcore/blob/v10.0.0/src/SignalR/clients/java/signalr/core/src/main/java/com/microsoft/signalr/HttpHubConnectionBuilder.java)
+- [Exact v10.0.0 connection source](https://github.com/dotnet/aspnetcore/blob/v10.0.0/src/SignalR/clients/java/signalr/core/src/main/java/com/microsoft/signalr/HubConnection.java)
+
+The implementation uses the actual Java `start()`/`stop()` RxJava3 `Completable`, `onClosed`, `on`, `withHeader`, direct-WebSocket option and OkHttp builder callback. It does **not** assume the .NET client's automatic-reconnect APIs exist.
+
+## Self-review / remaining verification
+
+**Owner-verified on a physical phone (2026-10-04):** Gradle sync/compile with JBR 21, app install/launch, pairing with one PC, and library (names) loading. Fixes found during that first run are listed in [`docs/WORKLOG.md`](../../docs/WORKLOG.md). Covers and the hidden-Stopped status UI were fixed afterwards and still need a re-run.
+
+Source review traced pairing → encrypted persistence → identity-first reconnect → authenticated REST/hub → buffered status merge → Compose → launch, and independent removal/cancellation. Review fixes included retrying handshake timeouts (rather than treating them as lifecycle cancellation), guarding old callbacks, promptly marking a closed hub offline, preserving terminal pairing errors through cleanup, disabling automatic POST retry, and resetting invalidated Keystore keys. Still **not verified**: covers rendering, live Running/Stopped changes over SignalR, remote launch end-to-end, Keystore persistence across restarts, and Android lifecycle edge cases.
+
+Owner walkthrough still needed: pair two PCs; wrong/expired code; encrypted persistence after restart; covers; live Running/Stopped changes; library edits during refresh; each PC offline/recovery independently; phone pause/resume; PC restart; wrong device at a saved address; revoked token; launch failure/unknown game; remove/re-pair; narrow screen/accessibility. No test suite was added. This Android handoff does not close the parent Windows/server task.

@@ -4,6 +4,8 @@ using System.Net.Http;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Serialization;
+using GameLauncher.Companion;
 using System.Windows.Forms;
 using GameLauncher.Data;
 using GameLauncher.Desktop;
@@ -34,11 +36,21 @@ internal static class Program
         {
             paths = new AppPaths();
             var sessionKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-            server = CreateServer(paths, sessionKey);
-            server.StartAsync().GetAwaiter().GetResult();
+            using var companion = new CompanionAccess(paths);
+            server = CreateServer(paths, sessionKey, companion);
+            try { server.StartAsync().GetAwaiter().GetResult(); }
+            catch (IOException ex) when (companion.ListeningPort.HasValue)
+            {
+                // A busy/blocked optional LAN port must not take down the desktop product.
+                TryLog(paths, ex);
+                server.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                companion.SetListener(null, "LAN listener could not start. Check the port/firewall, then restart. " + ex.Message);
+                server = CreateServer(paths, sessionKey, companion, allowLan: false);
+                server.StartAsync().GetAwaiter().GetResult();
+            }
             var addresses = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()
                 ?? throw new InvalidOperationException("The local server did not report its address.");
-            var origin = new Uri(addresses.Addresses.Single());
+            var origin = new Uri(addresses.Addresses.Single(x => x.StartsWith("http://127.0.0.1:", StringComparison.Ordinal)));
             using var window = new LauncherWindow(origin, sessionKey, paths, server.Services.GetRequiredService<DesktopPreferences>());
             server.Services.GetRequiredService<FolderPicker>().Attach(window);
             Application.Run(window);
@@ -64,7 +76,7 @@ internal static class Program
         }
     }
 
-    private static WebApplication CreateServer(AppPaths paths, string sessionKey)
+    private static WebApplication CreateServer(AppPaths paths, string sessionKey, CompanionAccess companion, bool allowLan = true)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -75,13 +87,22 @@ internal static class Program
         });
         // A desktop app must not inherit externally configured network endpoints.
         builder.Configuration.Sources.Clear();
+        var lanPort = allowLan && companion.Enabled ? (int?)companion.Port : null;
+        if (allowLan) companion.SetListener(lanPort, companion.ListenerError);
         builder.WebHost.ConfigureKestrel(options =>
         {
             options.Listen(IPAddress.Loopback, 0);
+            if (lanPort.HasValue) options.Listen(IPAddress.Any, lanPort.Value);
             options.AddServerHeader = false;
             options.Limits.MaxRequestBodySize = 262144;
         });
         builder.Services.AddRazorPages();
+        builder.Services.AddSingleton(companion);
+        builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+        builder.Services.AddSignalR(options => options.MaximumReceiveMessageSize = 4096)
+            .AddJsonProtocol(options => options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+        builder.Services.AddSingleton<GameStatusMonitor>();
+        builder.Services.AddHostedService(services => services.GetRequiredService<GameStatusMonitor>());
         builder.Services.Configure<FormOptions>(options => options.ValueCountLimit = 4096);
         builder.Services.AddAntiforgery(options =>
         {
@@ -128,6 +149,11 @@ internal static class Program
         var expected = Encoding.ASCII.GetBytes(sessionKey);
         app.Use(async (context, next) =>
         {
+            if (lanPort.HasValue && context.Connection.LocalPort == lanPort.Value)
+            {
+                await CompanionEndpoints.HandleLanRequest(context, next, companion);
+                return;
+            }
             var supplied = context.Request.Headers["X-Launcher-Session"].ToString();
             if (context.Request.Host.Host != "127.0.0.1" ||
                 context.Request.Host.Port != context.Connection.LocalPort ||
@@ -144,13 +170,18 @@ internal static class Program
             context.Response.Headers["X-Content-Type-Options"] = "nosniff";
             context.Response.Headers["Referrer-Policy"] = "no-referrer";
             context.Response.Headers["Cache-Control"] = "no-store";
-            await next();
+            await next(context);
         });
         app.UseExceptionHandler(handler => handler.Run(async context =>
         {
             var failure = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
             if (failure is not null) TryLog(paths, failure.Error);
             context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            if (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/hubs"))
+            {
+                await context.Response.WriteAsJsonAsync(new GameLauncher.Contracts.CommandResponse("The PC could not complete the request. Check Game Launcher on Windows."));
+                return;
+            }
             context.Response.ContentType = "text/html; charset=utf-8";
             await context.Response.WriteAsync("<!doctype html><html><body><h1>That action could not be completed.</h1>" +
                 "<p>Your game files have not been removed. Return to the library and try again.</p><a href='/'>Back to library</a></body></html>");
@@ -182,6 +213,7 @@ internal static class Program
                 return TypedResults.NotFound();
             }
         });
+        app.MapCompanion();
         app.MapRazorPages();
         return app;
     }

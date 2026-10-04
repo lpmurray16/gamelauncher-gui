@@ -44,7 +44,7 @@ Both scripts resolve paths relative to their own location, so they can also be c
 
 Alternatively, open the solution in a .NET-10-capable IDE and select GameLauncher as the startup project.
 
-The application opens its own desktop window. There is no normal browser URL to use: the embedded server is bound to a random loopback port and only requests authenticated by the desktop shell are accepted.
+The application opens its own desktop window. The Razor UI remains on a random loopback port with desktop-shell authentication; it is not a normal browser site. The optional Android companion adds a separate LAN listener exposing only its API/SignalR routes, not the desktop UI. See [Android companion setup and security](docs/companion.md).
 
 ### First manual walkthrough
 
@@ -119,7 +119,7 @@ src/GameLauncher/
   Properties/PublishProfiles/Windows.pubxml
 ```
 
-One application project keeps the initial implementation simple. Services are separated from page handlers and the window so they can evolve without coupling game management to the UI.
+The solution contains the Windows app and `src/GameLauncher.Contracts` (wire DTOs only). `src/GameLauncher.Companion` is a separate native Kotlin/Jetpack Compose Android Gradle project in the same repository, opened in Android Studio—not a MAUI project or a .NET solution build dependency. Windows builds and the installer do not need Android tooling. Kotlin models mirror the documented JSON contracts rather than referencing the .NET assembly.
 
 ## v1.0 installer
 

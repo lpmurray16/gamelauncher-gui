@@ -7,3 +7,4 @@
 - Keep privileged operations behind authenticated, antiforgery-protected local endpoints.
 - No storefront account/library integrations or bundled private API keys.
 - Do not publish to GitHub, choose a license, or push without authorization.
+- Android companion (Kotlin/Compose, `src/GameLauncher.Companion`): read `docs/WORKLOG.md` first for current state and next steps, and append to it after each change.
