@@ -210,11 +210,32 @@ public sealed class CompanionAccess : IDisposable
             (b[0] == 192 && b[1] == 168) || (b[0] == 169 && b[1] == 254);
     }
 
-    public static IReadOnlyList<string> GetLanAddresses() => NetworkInterface.GetAllNetworkInterfaces()
-        .Where(x => x.OperationalStatus == OperationalStatus.Up && x.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-        .SelectMany(x => x.GetIPProperties().UnicastAddresses)
-        .Select(x => x.Address).Where(x => IsLocalAddress(x) && !IPAddress.IsLoopback(x))
-        .Select(x => x.ToString()).Distinct().OrderBy(x => x, StringComparer.Ordinal).ToArray();
+    public sealed record LanAddress(string Host, string Adapter, bool Preferred)
+    {
+        public string Label => $"{Adapter} — {Host}" + (Preferred ? " (suggested)" : "");
+    }
+
+    public static IReadOnlyList<LanAddress> GetLanAddresses()
+    {
+        var addresses = new List<LanAddress>();
+        foreach (var adapter in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            if (adapter.OperationalStatus != OperationalStatus.Up || adapter.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                continue;
+            var properties = adapter.GetIPProperties();
+            // A routing hint, not proof this interface can reach the phone (VPNs can look like Ethernet).
+            var preferred = (adapter.NetworkInterfaceType is NetworkInterfaceType.Ethernet or NetworkInterfaceType.Wireless80211) &&
+                properties.GatewayAddresses.Any(x => x.Address.AddressFamily == AddressFamily.InterNetwork &&
+                    !x.Address.Equals(IPAddress.Any));
+            foreach (var address in properties.UnicastAddresses.Select(x => x.Address))
+            {
+                if (IsLocalAddress(address) && !IPAddress.IsLoopback(address))
+                    addresses.Add(new LanAddress(address.ToString(), adapter.Name, preferred));
+            }
+        }
+        return addresses.OrderByDescending(x => x.Preferred).ThenBy(x => x.Adapter, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.Host, StringComparer.Ordinal).DistinctBy(x => x.Host).ToArray();
+    }
 
     public void Dispose()
     {

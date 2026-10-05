@@ -1,4 +1,4 @@
-# Android companion — manual-pairing MVP
+# Android companion — QR and manual pairing
 
 ## Status and scope
 
@@ -6,16 +6,16 @@ This change adds an opt-in Windows LAN API and a native Kotlin/Jetpack Compose A
 
 The existing Windows project has not moved. Windows builds remain independent of Android tooling; `RunBuild.bat`, `RunLocalProj.bat`, and the installer retain their original entry points. The solution contains Windows + Contracts, not the Android Gradle project. The installer dependency-notice collector filters NuGet package entries instead of treating the new project reference as a package.
 
-MVP scope: manual pairing, multiple independent PCs, covers, launching existing Games entries (including their configured launch companions), and live process status. Automatic discovery and game stopping are deferred. No cloud service, storefront integration, arbitrary remote executable path, router configuration, or background Windows service is introduced.
+MVP scope: QR-assisted and manual pairing, multiple independent PCs, covers, launching existing Games entries (including their configured launch companions), and live process status. Automatic discovery and game stopping are deferred. No cloud service, storefront integration, arbitrary remote executable path, router configuration, or background Windows service is introduced.
 
 ## First connection
 
 1. Close the old Windows launcher, build with `RunBuild.bat`, then launch with `RunLocalProj.bat`. Back up the library data before exercising the new migration.
 2. Open **Settings → Manage companion access**. Enable LAN access, keep port **5180** unless it is occupied, save, and restart the launcher.
-3. The page shows the active port and local IPv4 addresses. Choose the address on the same trusted network as your phone, not a VPN/virtual-adapter address.
+3. The page shows the active port and local IPv4 addresses with adapter names. QR pairing suggests an active Wi-Fi/Ethernet adapter with an IPv4 gateway; this is a routing hint, not a reachability guarantee. Choose the address on the same trusted network as your phone, not a VPN/virtual-adapter address.
 4. If needed, explicitly install the narrowly scoped firewall rule described below. Do not disable Windows Firewall.
 5. Open `src/GameLauncher.Companion` in Android Studio. Follow its README for the pinned SDK/JDK/Gradle configuration, then run the app on your already-authorized physical phone.
-6. Generate a code on the Windows companion page. In Android, add the computer using its host/IP, port, and the code. Codes expire after two minutes; one successful exchange or five failed attempts consumes the code. Generate a separate fresh code for each phone.
+6. Click **Generate pairing QR / code** on Windows. On Android choose **Add PC → Scan QR**, scan the screen, check the computer/address, then confirm the trusted-network warning and tap Pair. Change the Windows network-address selector if needed; it changes the QR without replacing the code or extending its lifetime. Manual host/IP, port and code entry remains available. Codes expire after two minutes; one successful exchange or five failed attempts consumes the code. Generate a separate fresh code for each phone.
 7. Repeat on a second PC. Swipe between computer pages; each owns its credentials, connection and game state.
 
 The desktop must remain running. The phone talks over LAN even when USB is attached for debugging. Guest Wi-Fi/AP isolation and VPN routing can prevent communication. IPv6-only networks and public Internet addresses are not supported by this first version.
@@ -76,6 +76,14 @@ Shared C# DTOs: `src/GameLauncher.Contracts/CompanionContracts.cs`. Kotlin mirro
 
 `coverUrl` is relative to the paired PC, includes a cache-version value, and is null without artwork. It never contains an absolute Windows path. SignalR revision increases during a Windows process lifetime and resets on restart. It orders events, not persistent database versions. Clients resynchronize on a new connection. The hub has no command methods. Metadata/library changes use periodic REST refresh in this MVP; no `LibraryChanged` event is promised.
 
+## QR pairing format v1
+
+The QR is JSON with `format: "gamelauncher-pair"`, `formatVersion: 1`, `host` (private/link-local IPv4 string), `port` (active listener integer), `code` (eight-digit **string**, including leading zeroes), `deviceId` (GUID string), `deviceName` (display string), and `protocolVersion: 1`. It contains **no bearer token**. The Android scanner validates this envelope and compares `/api/device` against its expected GUID **before** submitting the code. The display name/ID are not cryptographic authentication; the existing trusted-LAN HTTP warning still applies.
+
+Windows uses **QRCoder 1.6.0 (MIT)** to render PNG data URLs locally inside the authenticated, antiforgery-protected Pair POST response. No CDN, external QR service, new public endpoint, or CSP relaxation is used. Existing `Cache-Control: no-store` covers the response. The page hides/removes the QR and readable code at expiry; the server remains authoritative for consumption, replacement and expiry. The page does not poll for consumption, so a used/replaced code can remain visible until expiry. Android retains explicit confirmation; scanning never sends a pairing request automatically. There is no external URI handler.
+
+Upstream QRCoder package metadata and the tagged `PngByteQRCodeHelper.GetQRCode` API were source-checked. The installer already collects NuGet package notices/metadata. Dependencies have not been restored, and QR readability and scanning still require the owner-run walkthrough below.
+
 ## Discovery investigation / next increment
 
 Use standard DNS-SD/mDNS rather than an IP scan or custom broadcast protocol. Android supplies [`NsdManager`](https://developer.android.com/develop/connectivity/wifi/use-nsd); Windows 10+ supplies [`DnsServiceRegister`](https://learn.microsoft.com/en-us/windows/win32/api/windns/nf-windns-dnsserviceregister) with asynchronous registration/deregistration tied to process lifetime.
@@ -89,6 +97,7 @@ These checks have not been executed by the assistant. No test suite is added.
 - Build Windows via RunBuild and Android via Android Studio; check a desktop-only machine does not request Android workloads.
 - Start with an existing library: migration preserves games/artwork/bundles/collections. Desktop scanning/editing/launching still works; removing entries leaves files untouched.
 - LAN disabled: no LAN listener. Enabled: desktop UI remains inaccessible from phone, `/api/device` works, protected endpoints reject missing/invalid bearer tokens. Expired/consumed codes fail, and a fresh code succeeds.
+- QR: scan and pair without typing; choose a different adapter without changing the code; check a saved-port change still encodes the active port; let a code expire and generate another. Confirm manual entry works after camera denial/cancellation. Check malformed/foreign QR rejection, leading-zero codes, wrong device identity, phone rotation/scanner return, and narrow Windows layout. QR contents and rendered camera readability have not been runtime-verified.
 - Unknown GUID gives 404; launch body is rejected; launching a known game honors the same stored options and bundles as Windows UI.
 - Start/exit a tracked game from Windows, Android and manually; observe Playing/reordering and exit transitions without repeated unchanged events. Check untracked shortcut explanation and overridden tracking paths.
 - Pair two PCs and confirm their libraries/status/artwork remain independent. Remove/reconnect one without affecting the other.

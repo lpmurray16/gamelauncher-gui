@@ -1,4 +1,34 @@
 "use strict";
+// QR images are generated locally in the authenticated POST response; no code enters a URL or storage.
+(() => {
+  const pairing = document.querySelector('[data-companion-pairing]');
+  if (!pairing) return;
+  const live = pairing.querySelector('[data-pairing-live]');
+  const status = pairing.querySelector('[data-pairing-status]');
+  const network = pairing.querySelector('[data-pairing-network]');
+  const images = Array.from(pairing.querySelectorAll('[data-pairing-host]'));
+  const expires = Number(pairing.dataset.expires);
+  let timer;
+  const refresh = () => {
+    window.clearTimeout(timer);
+    const remaining = expires - Date.now();
+    if (!Number.isFinite(remaining) || remaining <= 0) {
+      live.hidden = true;
+      live.replaceChildren();
+      status.textContent = 'Pairing code expired. Generate a fresh QR / code above.';
+      return;
+    }
+    live.hidden = false;
+    images.forEach((image) => { image.hidden = image.dataset.pairingHost !== network?.value; });
+    status.textContent = 'Available until the expiry above unless already used or replaced. Generate a fresh code for another phone.';
+    timer = window.setTimeout(refresh, Math.min(remaining, 1000));
+  };
+  network?.addEventListener('change', refresh);
+  document.addEventListener('visibilitychange', refresh);
+  window.addEventListener('pageshow', refresh);
+  window.addEventListener('pagehide', () => { live.hidden = true; window.clearTimeout(timer); });
+  refresh();
+})();
 // Keep the viewport and controller focus when changing library filters or sort.
 // Normal navigation still starts at the top; this state is consumed only once.
 (() => {

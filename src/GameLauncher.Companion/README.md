@@ -1,6 +1,6 @@
 # Game Launcher — Android companion
 
-Native Kotlin / Jetpack Compose manual-pairing MVP. Open **this directory** in Android Studio; it is a separate Gradle project, not a .NET solution project. There is no fake library, bundled credential, discovery service, or test scaffold.
+Native Kotlin / Jetpack Compose companion with QR and manual pairing. Open **this directory** in Android Studio; it is a separate Gradle project, not a .NET solution project. There is no fake library, bundled credential, discovery service, or test scaffold.
 
 ## Toolchain (owner-run only)
 
@@ -22,8 +22,8 @@ After selecting JDK 17 and SDK 36, connect your already-authorized Android phone
 
 ## Pair and use
 
-1. On each Windows PC, open **Settings → Manage companion access**, enable LAN access, save, and restart the Windows launcher. Keep it running. Select the displayed IPv4 address on the phone's trusted Wi-Fi/LAN (not a VPN/virtual adapter). Generate an 8-digit code; it expires after two minutes and is consumed after success or five failed attempts. Windows defaults to port 5180, but always enter the actual port shown. See [the parent setup/firewall guide](../../docs/companion.md); do not disable Windows Firewall.
-2. On Android, choose **Add PC**. Enter just the host/IPv4 and the port displayed by Windows (no assumed port), then the code. Confirm the trusted-network warning.
+1. On each Windows PC, open **Settings → Manage companion access**, enable LAN access, save, and restart the Windows launcher. Keep it running. Select the displayed IPv4 address on the phone's trusted Wi-Fi/LAN (not a VPN/virtual adapter). Choose **Generate pairing QR / code**; it expires after two minutes and is consumed after success or five failed attempts. Windows defaults to port 5180, but QR pairing transfers the actual active port (for manual entry, enter the active port shown). See [the parent setup/firewall guide](../../docs/companion.md); do not disable Windows Firewall.
+2. On Android, choose **Add PC → Scan QR** and scan the QR displayed on the Windows Companion page for the selected network address. Camera permission is requested only when opening the scanner. Check the scanned **computer name and address**, explicitly check **I trust this network**, then tap **Pair**. Scanning never connects or pairs automatically. Alternatively, choose **Enter manually**, enter just the host/IPv4, the actual port displayed by Windows (no assumed port), and the code, then confirm the same trusted-network warning.
 3. Each paired PC has its own connection, retry loop, library, and status. Tap a PC chip or swipe horizontally; its two-column cover grid scrolls vertically inside the pager.
 4. **Connected** requires a matching device identity, successful authenticated REST, a connected SignalR hub, and a fresh REST snapshot after hub startup. Running games sort first and show a green **Playing** badge; Starting/Stopping show an orange **Starting…/Closing…** badge. `Stopped` only means "not running", so it is deliberately not labelled. Untrackable entries simply never show a badge (`canTrackStatus` is still parsed but not displayed).
 5. Launch sends one request and shows the server message. No stop control is provided. The client does not invent a Running status after launch. A lost response warns that the game may already have launched; POSTs are not automatically retried.
@@ -31,6 +31,14 @@ After selecting JDK 17 and SDK 36, connect your already-authorized Android phone
 7. Library edits refresh every 30 seconds while connected. Status events received during each GET are buffered and replayed over the REST snapshot, with per-game revision filtering within each hub connection. Epoch and connection guards discard obsolete callbacks. `LibraryChanged` is not required/used.
 8. Offline PCs retain their last in-memory library with launch disabled and “Was playing” rather than a claim of live status. Library/covers are not persisted to disk. Covers load using the authenticated REST client and show a title placeholder if absent/unavailable.
 9. **Remove** forgets that phone's connection/token only; it never deletes games. It does not revoke the token on Windows. Use the PC's token-revocation control when needed. Re-pairing the same device replaces the local connection; pairing a different device adds another page.
+
+### QR pairing details and fallback
+
+- Scanning is QR-only, bundled and offline: JourneyApps ZXing Android Embedded **4.3.0**, with ZXing Core **3.4.1** transitively. No Google Play services, separate scanner app, cloud recognition, deep links, clipboard flow, or discovery is used. No barcode image is saved.
+- If permission is denied, the scanner closes back to the pairing dialog with manual entry available. For permanent denial, enable Camera in Android app settings before scanning again. Back/cancellation, missing/busy camera, scanner-launch errors and invalid payloads leave manual entry available without submitting a code.
+- Dialog visibility, fields, scanned name/expected device ID, warning and trust state use `rememberSaveable` across activity recreation, including rotation while scanning. Every scan result resets trust; editing any pairing field clears the scanned identity and trust. **Enter manually** also clears the code. Only tapping Pair can submit.
+- Payload is a strict JSON object of at most **4096 characters**, with exactly these fields: string `format: "gamelauncher-pair"`; integer `formatVersion: 1`; string `host` (dotted-decimal private/link-local IPv4, no loopback); integer `port` (1024–65535, the active listener); string `code` (exactly eight ASCII digits); string `deviceId` (hyphenated GUID); string `deviceName` (at most 256 characters); integer `protocolVersion: 1`. Private/link-local ranges are 10/8, 172.16/12, 192.168/16 and 169.254/16. Unknown/duplicate/missing fields, wrong token types, decimal/exponent numbers and trailing data are rejected. No expiry is encoded or inferred: Windows decides whether the code is still valid; request a fresh QR/code if it expires.
+- Before submitting a scanned code, the model fetches `/api/device` without credentials and compares its GUID with the QR's expected ID. A mismatch stops before `/api/pair`; the existing identity check on the pairing response also remains. This prevents accidental pairing to a different installation at a changed address, **not** active HTTP impersonation.
 
 ## LAN and credential boundary
 
@@ -51,6 +59,7 @@ This MVP is **HTTP on a trusted private LAN only**. Cleartext is explicitly enab
 - `PcStore.kt`: Android Keystore AES-GCM persistence and reset.
 - `PcSession.kt`: independent SignalR Java client, retry/lifecycle, REST-event merge, launch/cover requests.
 - `CompanionModel.kt`: paired-PC collection, serialized persistence, pairing/removal/lifecycle.
+- `PairingQr.kt`: bounded strict JSON/token/schema validation and QR-only non-loopback IPv4 validation.
 - `MainActivity.kt`: Compose onboarding, pairing dialog, PC pager, two-column grids, connection/status controls.
 - `Theme.kt`: Material 3 dark scheme mirroring the Windows `site.css` palette (`#101113` background, `#FF8A47` accent, soft `.launch` buttons, success-panel green for Playing).
 - `res/mipmap-*`: adaptive launcher icon (rocket launchpad) with background `#070708`, a transparent foreground and an Android 13+ themed monochrome layer; `drawable-nodpi/brand_mark.png` is the same artwork for in-app use. `app/src/main/ic_launcher-playstore.png` is the 512px source copy and is not packaged.
@@ -60,6 +69,9 @@ This MVP is **HTTP on a trusted private LAN only**. Cleartext is explicitly enab
 Pinned direct versions were checked by retrieving their POMs from **Google Maven** (`https://dl.google.com/dl/android/maven2/`) or **Maven Central** (`https://repo.maven.apache.org/maven2/`): AGP 8.13.2; Kotlin/Compose plugins 2.3.10; Compose BOM 2025.10.00; Activity Compose 1.11.0; Lifecycle runtime-compose/viewmodel-ktx 2.9.4; Coroutines Android 1.10.2; SignalR 10.0.0; OkHttp 4.12.0. Compose UI, Foundation and Material3 are versioned by the verified BOM, not independently guessed.
 
 Compatibility and client API references:
+
+- [JourneyApps 4.3.0 Maven Central POM](https://repo.maven.apache.org/maven2/com/journeyapps/zxing-android-embedded/4.3.0/zxing-android-embedded-4.3.0.pom): exact published dependency and bundled ZXing Core version verified without a restore.
+- [JourneyApps v4.3.0 README](https://github.com/journeyapps/zxing-android-embedded/blob/v4.3.0/README.md), [ScanContract](https://github.com/journeyapps/zxing-android-embedded/blob/v4.3.0/zxing-android-embedded/src/com/journeyapps/barcodescanner/ScanContract.java), [ScanOptions](https://github.com/journeyapps/zxing-android-embedded/blob/v4.3.0/zxing-android-embedded/src/com/journeyapps/barcodescanner/ScanOptions.java) and [CaptureManager](https://github.com/journeyapps/zxing-android-embedded/blob/v4.3.0/zxing-android-embedded/src/com/journeyapps/barcodescanner/CaptureManager.java): QR format selection, camera runtime permission/denial result, image-saving toggle and orientation APIs checked against release source. Library default API 24+ is below this app's API 26 minimum.
 
 - [AGP 8.13 compatibility, including JDK 17, Gradle 8.13, API 36 support, and 8.13.2 Kotlin 2.3 support](https://developer.android.com/build/releases/agp-8-13-0-release-notes)
 - [Gradle 8.13 Java compatibility: JDK 24+ unsupported](https://docs.gradle.org/8.13/userguide/compatibility.html)
@@ -71,6 +83,8 @@ Compatibility and client API references:
 The implementation uses the actual Java `start()`/`stop()` RxJava3 `Completable`, `onClosed`, `on`, `withHeader`, direct-WebSocket option and OkHttp builder callback. It does **not** assume the .NET client's automatic-reconnect APIs exist.
 
 ## Self-review / remaining verification
+
+**QR increment is source-reviewed only.** No build, restore, tests, installation or launch was performed for it. Owner checks still needed: successful QR/manual pairing; wrong-device QR (no code submitted); malformed/oversized/unsupported QR; expired code; denied/permanently-denied camera permission; no camera; cancellation; rotation during scanner and after scan; restored confirmation fields/expected ID; explicit trust reset after scans/edits; narrow-screen/accessibility layout. Dependency/manifest merging and runtime camera behavior remain unverified.
 
 **Owner-verified on a physical phone (2026-10-04):** Gradle sync/compile with JBR 21, app install/launch, pairing with one PC, and library (names) loading. Fixes found during that first run are listed in [`docs/WORKLOG.md`](../../docs/WORKLOG.md). Covers and the hidden-Stopped status UI were fixed afterwards and still need a re-run.
 

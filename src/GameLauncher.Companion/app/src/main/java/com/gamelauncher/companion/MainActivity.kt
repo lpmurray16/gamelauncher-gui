@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -22,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -33,6 +35,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.zxing.client.android.Intents
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -53,7 +58,7 @@ class MainActivity : ComponentActivity() {
 private fun CompanionApp(model: CompanionModel) {
     val sessions by model.sessions.collectAsStateWithLifecycle()
     val storageError by model.storageError.collectAsStateWithLifecycle()
-    var showPair by remember { mutableStateOf(false) }
+    var showPair by rememberSaveable { mutableStateOf(false) }
     var removing by remember { mutableStateOf<PcSession?>(null) }
     var resetting by remember { mutableStateOf(false) }
     val pager = rememberPagerState(pageCount = { sessions.size })
@@ -113,20 +118,80 @@ private fun CompanionApp(model: CompanionModel) {
 
 @Composable
 private fun PairDialog(model: CompanionModel, dismiss: () -> Unit) {
-    var host by remember { mutableStateOf("") }
-    var port by remember { mutableStateOf("") }
-    var code by remember { mutableStateOf("") }
-    var trusted by remember { mutableStateOf(false) }
+    var host by rememberSaveable { mutableStateOf("") }
+    var port by rememberSaveable { mutableStateOf("") }
+    var code by rememberSaveable { mutableStateOf("") }
+    var trusted by rememberSaveable { mutableStateOf(false) }
+    var expectedDeviceId by rememberSaveable { mutableStateOf<String?>(null) }
+    var deviceName by rememberSaveable { mutableStateOf<String?>(null) }
+    var scanMessage by rememberSaveable { mutableStateOf<String?>(null) }
     val busy by model.busy.collectAsStateWithLifecycle()
     val error by model.pairingError.collectAsStateWithLifecycle()
+    val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
+        trusted = false
+        expectedDeviceId = null
+        deviceName = null
+        code = ""
+        model.pairingError.value = null
+        val contents = result.contents
+        if (contents == null) {
+            scanMessage = if (result.originalIntent?.getBooleanExtra(Intents.Scan.MISSING_CAMERA_PERMISSION, false) == true)
+                "Camera permission was denied. Enter manually, or enable Camera in Android app settings and scan again."
+            else "Scan cancelled or camera unavailable. Try again or enter manually."
+        } else {
+            try {
+                require(result.formatName == ScanOptions.QR_CODE) { "Only pairing QR codes are supported" }
+                val qr = PairingQr.parse(contents)
+                host = qr.host
+                port = qr.port.toString()
+                code = qr.code
+                expectedDeviceId = qr.deviceId
+                deviceName = qr.deviceName
+                scanMessage = null
+            } catch (_: Exception) {
+                // Do not display/log the raw payload or parser exception (it can contain the code).
+                scanMessage = "Not a valid supported Game Launcher pairing QR. Scan a fresh QR from Windows, or enter manually."
+            }
+        }
+    }
+    fun enterManually() {
+        expectedDeviceId = null
+        deviceName = null
+        trusted = false
+        scanMessage = null
+        model.pairingError.value = null
+    }
     AlertDialog(onDismissRequest = { if (!busy) dismiss() }, title = { Text("Pair a Windows PC") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Use the host, port, and new 8-digit code from the Windows Companion page. Enter a hostname or IPv4 address, not a URL.")
-                OutlinedTextField(value = host, onValueChange = { host = it }, label = { Text("PC hostname or IPv4") }, singleLine = true, enabled = !busy)
-                OutlinedTextField(value = port, onValueChange = { port = it }, label = { Text("Port shown on PC") }, singleLine = true, enabled = !busy,
+                Text("Scan uses this phone’s camera only; no Google services or internet connection is needed. Camera access is optional for manual entry.", style = MaterialTheme.typography.bodySmall)
+                Row {
+                    TextButton(enabled = !busy, onClick = {
+                        enterManually()
+                        code = ""
+                        try {
+                            scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                .setPrompt("Scan the pairing QR on your Windows Companion page")
+                                .setBeepEnabled(false).setBarcodeImageEnabled(false).setOrientationLocked(false)
+                                .addExtra(Intents.Scan.SHOW_MISSING_CAMERA_PERMISSION_DIALOG, false))
+                        } catch (_: Exception) {
+                            scanMessage = "Camera scanner could not open. Enter the pairing details manually."
+                        }
+                    }) { Text("Scan QR") }
+                    TextButton(enabled = !busy, onClick = { enterManually(); code = "" }) { Text("Enter manually") }
+                }
+                if (expectedDeviceId != null) {
+                    Text("Confirm this computer", fontWeight = FontWeight.SemiBold)
+                    Text(deviceName.orEmpty().ifEmpty { "Unnamed PC" })
+                    Text("$host:$port")
+                    Text("Check the name and address against Windows, then confirm your trusted network and tap Pair. Scanning alone never pairs.", style = MaterialTheme.typography.bodySmall)
+                }
+                scanMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                OutlinedTextField(value = host, onValueChange = { enterManually(); host = it }, label = { Text("PC hostname or IPv4") }, singleLine = true, enabled = !busy)
+                OutlinedTextField(value = port, onValueChange = { enterManually(); port = it }, label = { Text("Port shown on PC") }, singleLine = true, enabled = !busy,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                OutlinedTextField(value = code, onValueChange = { code = it }, label = { Text("8-digit pairing code") }, singleLine = true, enabled = !busy,
+                OutlinedTextField(value = code, onValueChange = { enterManually(); code = it }, label = { Text("8-digit pairing code") }, singleLine = true, enabled = !busy,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
                 Text("HTTP is not encrypted. Anyone controlling this network can intercept codes, tokens, or commands. Use only your trusted private LAN; never public Wi-Fi or port forwarding.", style = MaterialTheme.typography.bodySmall)
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -137,7 +202,7 @@ private fun PairDialog(model: CompanionModel, dismiss: () -> Unit) {
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             }
         },
-        confirmButton = { TextButton(enabled = !busy && trusted, onClick = { model.pair(host, port, code, dismiss) }) { Text("Pair") } },
+        confirmButton = { TextButton(enabled = !busy && trusted, onClick = { model.pair(host, port, code, expectedDeviceId, dismiss) }) { Text("Pair") } },
         dismissButton = { TextButton(enabled = !busy, onClick = dismiss) { Text("Cancel") } })
 }
 

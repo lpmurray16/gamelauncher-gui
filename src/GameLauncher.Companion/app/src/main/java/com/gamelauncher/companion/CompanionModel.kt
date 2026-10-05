@@ -47,7 +47,7 @@ class CompanionModel(application: Application) : AndroidViewModel(application) {
     }
     fun reconnect(session: PcSession) { if (foreground) session.reconnect() }
 
-    fun pair(host: String, portText: String, code: String, completed: () -> Unit) {
+    fun pair(host: String, portText: String, code: String, expectedDeviceId: String?, completed: () -> Unit) {
         if (busy.value || storageError.value != null) return
         busy.value = true
         pairingError.value = null
@@ -55,8 +55,17 @@ class CompanionModel(application: Application) : AndroidViewModel(application) {
             try {
                 require(Regex("[0-9]{8}").matches(code)) { "Enter the 8-digit code shown on the PC" }
                 val port = portText.toIntOrNull() ?: throw IllegalArgumentException("Enter a valid port")
+                val expected = expectedDeviceId?.let { validId(it) }
+                if (expected != null) {
+                    PairingQr.requirePrivateIpv4(host)
+                    require(port in 1024..65535) { "QR pairing port must be between 1024 and 65535" }
+                }
                 val api = LanEndpoint.resolve(host.trim(), port)
                 val discovered = api.device()
+                // Never send the one-time code to a different installation at the scanned address.
+                require(expected == null || discovered.deviceId == expected) {
+                    "This address belongs to a different PC than the QR. No code was sent. Scan a fresh QR on the intended PC."
+                }
                 val response = JSONObject(String(api.bytes("/api/pair", body = JSONObject().put("code", code).toString()), Charsets.UTF_8))
                 val device = parseDevice(response.getJSONObject("device"))
                 require(device.deviceId == discovered.deviceId) { "PC identity changed while pairing" }
