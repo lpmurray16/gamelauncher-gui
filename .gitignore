@@ -3,6 +3,9 @@
 **/obj/
 artifacts/
 publish/
+# Distribute compiled executables and Android packages through GitHub Releases
+*.exe
+*.apk
 # IDE and local tools
 .vs/
 .idea/
