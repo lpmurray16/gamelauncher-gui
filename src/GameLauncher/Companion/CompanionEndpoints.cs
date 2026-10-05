@@ -45,6 +45,20 @@ public static class CompanionEndpoints
         await next(context);
     }
 
+    private static async Task<IResult> StopGame(Guid id, HttpContext context, LibraryService library, bool force)
+    {
+        if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
+            return Results.BadRequest(new CommandResponse("This command accepts only a saved game ID, with no request body."));
+        var entry = await library.GetAsync(id);
+        if (entry is null || entry.Category != LibraryCategory.Games) return Results.NotFound();
+        try { return Results.Ok(new CommandResponse(GameProcessControl.Stop(entry, force))); }
+        catch (InvalidOperationException error)
+        {
+            // GameProcessControl supplies safe messages, never executable paths or raw Win32 errors.
+            return Results.Conflict(new CommandResponse(error.Message));
+        }
+    }
+
     public static void MapCompanion(this WebApplication app)
     {
         app.MapGet("/api/device", (CompanionAccess access) => access.Device);
@@ -91,8 +105,10 @@ public static class CompanionEndpoints
                 return Results.Conflict(new CommandResponse("Windows could not complete the launch. Check the saved game and bundled launch settings on the PC, then retry."));
             }
         });
-        app.MapPost("/api/games/{id:guid}/stop", (Guid id) => Results.Json(
-            new CommandResponse("Stopping is not supported in this version; close the game on the PC."), statusCode: StatusCodes.Status501NotImplemented));
+        app.MapPost("/api/games/{id:guid}/stop", (Guid id, HttpContext context, LibraryService library) =>
+            StopGame(id, context, library, force: false));
+        app.MapPost("/api/games/{id:guid}/force-stop", (Guid id, HttpContext context, LibraryService library) =>
+            StopGame(id, context, library, force: true));
         app.MapHub<GamesHub>("/hubs/games", options =>
         {
             // Native client uses header authentication, including the WebSocket handshake.

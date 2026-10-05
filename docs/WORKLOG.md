@@ -19,6 +19,16 @@ Handoff log for agents/models continuing this work. Newest first. Keep entries s
 
 ## Log
 
+### Windows 1.5.1 release packaging
+- Explicitly requested `scripts/Build-Installer.ps1` completed Release publish and Inno Setup compilation. App/installer numeric versions `1.5.1.0` and installer checksum independently verified; both outputs unsigned. See `docs/releases/1.5.1.md`.
+- This verifies Windows compilation of the stop endpoints, not remote stop behavior. Android version/APK unchanged and not rebuilt. Installer not run; no app launch, upgrade or uninstall performed. Owner confirmed smooth LB/RB one-third jumps before packaging.
+
+### Remote game-stop groundwork (source-reviewed only)
+- Windows: replaced the 501 stop stub with authenticated bodyless saved-game-ID stop and force-stop endpoints. New `Services/GameProcessControl.cs` uses the monitor’s exact tracking path, a retained process handle, current Windows session and a single unambiguous match. Refuses inaccessible/multiple candidates, Steam and Launchpad; never accepts a remote path/PID or kills a process tree, requests elevation, or deletes files.
+- Android: Running tracked cards now offer Stop game → Close normally, with a separate Force stop warning/confirmation. Launch/stop share pending-command gating; stale connection responses are ignored, offline controls are disabled, and POSTs are not retried. Observed process status remains authoritative rather than assuming a close request succeeded.
+- Scope: existing manual tracking-executable configuration is used for shortcuts/Steam. Running-process picker, auto-discovery and remote keyboard/UAC control are not implemented.
+- Owner checks: rebuild both apps; direct EXE and configured Steam shortcut, normal close/save dialog, cancel/confirm force stop, Steam/bundles remaining alive, elevated/no-window/multiple-instance refusal, offline/reconnect and actual status clearing. See `docs/companion.md`. No builds, restores, tests, launches or process termination performed by the assistant.
+
 ### Launchpad display branding (source-reviewed only)
 - The user-facing name of both apps is **Launchpad**. Updated Android launcher label/header, Windows window/page titles, visible messages/product metadata, and installer display/shortcut names.
 - Internal GameLauncher assembly/executable/package IDs, registry/data paths, installer AppId and pairing format remain unchanged for compatibility. Existing installed shortcuts may retain their previous name until updated; installer upgrades have not been exercised.

@@ -26,7 +26,7 @@
         <nav aria-label="Main navigation">
             @foreach (var category in new[] { LibraryCategory.Games, LibraryCategory.Emulators, LibraryCategory.Tools })
             {
-                <a class="nav-link @(active == category.ToString() ? "active" : "")"
+                <a class="nav-link @(active == category.ToString() ? "active" : "")" data-category-nav
                    asp-page="/Index"
                    asp-route-category="@category"
                    aria-current="@(active == category.ToString() ? "page" : null)">
@@ -76,7 +76,7 @@
             <div class="notice toast" role="status" data-toast>@notice</div>
         }
         @RenderBody()
-        <p class="navigation-hint">Navigate: arrows / D-pad · Select: Enter / A · Options: Shift+F10 / X · Back: Esc / B · Sidebar: F1 / View · Jump to top / bottom: LB / RB · Favorite: Y (controller) · Windows keyboard: A on a text field / F2 · Fullscreen: F11</p>
+        <p class="navigation-hint">Navigate: arrows / D-pad · Select: Enter / A · Options: Shift+F10 / X · Back: Esc / B · Sidebar: F1 / View · Jump ⅓ back / forward: LB / RB · Category: L2 / R2 (LT / RT) · Favorite: Y (controller) · Windows keyboard: A on a text field / F2 · Fullscreen: F11</p>
         <footer class="page-footer">Less searching. More playing.<span>GAME LAUNCHER / LOCAL LIBRARY</span></footer>
     </main>
 </div>

@@ -1,10 +1,10 @@
-# Game Launcher
+# Launchpad
 
 A Windows-first, local-file game launcher built with **C# / .NET 10, Razor Pages, WinForms + WebView2, Entity Framework Core, and SQLite**.
 
-**Status:** v1.0.0 Windows x64 Release publish and Inno Setup installer compilation succeeded. The packaged application, installation, upgrade, uninstall, and missing-WebView2 flow still require a manual walkthrough. The project owner normally runs builds and launches; this release packaging was explicitly requested. No test suite is included or planned.
+**Release: 1.5.1.** Windows x64 Release publish and Inno Setup installer compilation succeeded; executable versions and installer SHA-256 were verified. The installer is unsigned. Installation, upgrade, uninstall, and missing-WebView2 behavior for this release still require a manual walkthrough. The owner confirmed the smooth one-third controller jumps work; other new runtime behavior is not implied by a successful build. No test suite is included or planned. See [1.5.1 release notes](docs/releases/1.5.1.md).
 
-## First slice
+## Features
 
 - Games, Emulators, and Tools sections with search and favorites.
 - Add, edit, and remove library entries without deleting their files.
@@ -76,7 +76,31 @@ In **Edit entry → Bundled launch group**, select up to eight existing library 
 - Companion bundles are not traversed, so circular links cannot cause recursive launches. No programs are automatically closed.
 - All launch files and working directories are checked before sending any launch requests. If Windows rejects a later request, remaining requests stop and the error identifies requests already sent. There is no process rollback.
 - Uncheck a companion and save to unlink it. Removing a library entry removes its incoming/outgoing bundle links, never its local files.
-- Bundle links are persisted by an additive EF migration on startup. This feature and migration are source-reviewed, not yet build/runtime-verified by the assistant.
+- Bundle links are persisted by an additive EF migration on startup. Included in the successful Windows Release build; migration execution and bundled-launch behavior were not exercised by the assistant.
+
+## Controller navigation
+
+- D-pad / left stick: move selection; **A** activates, **B** goes back, **X** opens card options, **Y** toggles favorite.
+- **LB / RB:** move selection backward/forward by one-third of the current filtered/sorted entry list, rounded up. The count is recalculated per press, includes offscreen entries, and clamps at the first/last card. Scrolling is smooth; header controls are excluded. With no selected/remembered card, the first press selects the first entry.
+- **L2 / R2 (LT / RT):** previous/next category, cycling Games → Emulators → Tools and wrapping. Uses the sidebar's category navigation, only on dashboards—not Edit or Settings. Release the trigger before switching again.
+- **View / Back:** toggle sidebar focus. Keyboard equivalents include arrows, Enter, Esc, Shift+F10 and F1. Press A on a text field (or F2) to request the Windows keyboard; F11 toggles fullscreen.
+- Input requires foreground focus and a neutral/released controller after navigation or reconnect. A jump/category switch does not also activate a card in the same frame.
+
+## Android companion and remote game stop
+
+The optional native Android app supports QR/manual pairing, multiple PCs, game covers, launch commands and live process status. See [setup/security](docs/companion.md) and the [Android README](src/GameLauncher.Companion/README.md). It is built separately in Android Studio and is **not included in the Windows installer**.
+
+- Enable companion access on Windows and pair only over a trusted private LAN. HTTP is unencrypted; never expose the port to the internet. Protected commands require the paired bearer credential.
+- Running tracked games offer **Stop game → Close normally**. A game may show a save/exit dialog on the PC. **Force stop instead…** requires a separate unsaved-progress confirmation.
+- Stopping targets one exact executable match in the launcher's Windows session—not a process tree or bundled apps. Inaccessible/ambiguous matches are refused; Steam and Launchpad themselves are explicitly blocked. Administrator-run/protected games may require closing on the PC. Playing clears based on observed exit, not request acceptance.
+- For shortcuts, Steam URLs or bootstrap launchers, set **Edit entry → Status tracking executable** to the actual game's `.exe`. Leave the shortcut as the launch target. A running-process picker and automatic executable discovery are not implemented.
+- Both sides need the updated code for Stop controls; this Windows build does not rebuild or replace an existing Android APK. No remote keyboard/UAC approval is implemented.
+
+## Artwork storage
+
+Choose cover and hero/background images through SteamGridDB or the local image picker. SteamGridDB requires your own configured API key; no private key is bundled.
+
+**Local selections are copied**, not linked, into `%LOCALAPPDATA%/GameLauncher/Artwork`, alongside downloaded images. The database stores the managed filename, not the source path. Moving/deleting the original after import does not break the artwork; editing the original does not update the copy. Replacing/clearing artwork removes the old managed copy, not the source image. Back up the Artwork folder together with the database, and keep unrelated originals outside this managed cache.
 
 ## Startup and fullscreen
 
@@ -95,6 +119,8 @@ Local application data lives under:
 ```text
 %LOCALAPPDATA%/GameLauncher/
   library.db
+  Artwork/           # managed copies of imported and downloaded images
+  companion-token.dat # protected pairing credential, when companion access is enabled
   WebView2/
   startup.log       # only created when an error is logged
 ```
@@ -121,9 +147,9 @@ src/GameLauncher/
 
 The solution contains the Windows app and `src/GameLauncher.Contracts` (wire DTOs only). `src/GameLauncher.Companion` is a separate native Kotlin/Jetpack Compose Android Gradle project in the same repository, opened in Android Studio—not a MAUI project or a .NET solution build dependency. Windows builds and the installer do not need Android tooling. Kotlin models mirror the documented JSON contracts rather than referencing the .NET assembly.
 
-## v1.0 installer
+## v1.5.1 installer
 
-Output: `artifacts/installer/GameLauncher-Setup-1.0.0-win-x64.exe`, with a companion `.sha256` checksum file. Only the setup executable is required for distribution.
+Output: `artifacts/installer/GameLauncher-Setup-1.5.1-win-x64.exe`, with a companion `.sha256` checksum file. Only the setup executable is required for distribution.
 
 - Windows x64 package; Setup requires Windows 10 22H2 or newer.
 - Per-user installation to `%LOCALAPPDATA%/Programs/GameLauncher`, without requesting administrator rights.
@@ -152,4 +178,4 @@ Verified: Release publish, installer compilation, output version and SHA-256 gen
 
 ## GitHub
 
-The repository is initialized locally on `main`. No remote repository has been created or linked and nothing has been pushed. Repository visibility and licensing remain the owner's choice. Do not publish personal library data or API credentials.
+Release packaging does not commit, push, or publish a GitHub release. Repository visibility and licensing remain the owner’s choice. Do not publish personal library data or API credentials.

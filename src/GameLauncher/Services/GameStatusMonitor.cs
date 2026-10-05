@@ -196,7 +196,7 @@ public sealed class GameStatusMonitor(
         Win32Exception or InvalidOperationException or NotSupportedException or UnauthorizedAccessException
         or IOException or System.Security.SecurityException or ArgumentException;
 
-    private static string? TrackingPath(LibraryEntry entry)
+    internal static string? TrackingPath(LibraryEntry entry)
     {
         // Do not check File.Exists here: existence is validated only when a nonempty override is saved.
         var path = entry.TrackingExecutablePath ?? entry.TargetPath;

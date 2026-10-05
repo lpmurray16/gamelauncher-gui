@@ -26,7 +26,7 @@ data class PcUi(
     val online: Boolean = false,
     val connection: String = "Offline",
     val games: List<Game> = emptyList(),
-    val launching: Set<String> = emptySet(),
+    val commanding: Set<String> = emptySet(),
     val message: String? = null,
     val generation: Long = 0
 )
@@ -131,7 +131,7 @@ class PcSession(val saved: SavedPc, private val scope: CoroutineScope) {
                         endpoint = null
                         refreshing = false
                         buffered.clear()
-                        mutable.value = mutable.value.copy(online = false, launching = emptySet())
+                        mutable.value = mutable.value.copy(online = false, commanding = emptySet())
                     }
                     withContext(NonCancellable) {
                         withTimeoutOrNull(3000) { runCatching { hub?.stop()?.awaitCompletion() } }
@@ -150,7 +150,7 @@ class PcSession(val saved: SavedPc, private val scope: CoroutineScope) {
         loop = null
         endpoint = null
         failure?.complete(Unit)
-        mutable.value = mutable.value.copy(online = false, connection = "Offline", launching = emptySet())
+        mutable.value = mutable.value.copy(online = false, connection = "Offline", commanding = emptySet())
     }
 
     private suspend fun refresh(api: LanEndpoint) {
@@ -176,26 +176,36 @@ class PcSession(val saved: SavedPc, private val scope: CoroutineScope) {
         })
     }
 
-    fun launch(game: Game) {
+    fun launch(game: Game) = command(game, "launch")
+
+    fun stopGame(game: Game, force: Boolean = false) = command(game, if (force) "force-stop" else "stop")
+
+    private fun command(game: Game, action: String) {
         val api = endpoint ?: return
-        if (!mutable.value.online || game.id in mutable.value.launching || game.status != "Stopped") return
+        val latest = mutable.value.games.firstOrNull { it.id == game.id } ?: return
+        if (!mutable.value.online || game.id in mutable.value.commanding) return
+        if (action == "launch") {
+            if (latest.status != "Stopped") return
+        } else if (!latest.canTrackStatus || latest.status != "Running") return
         val current = epoch
-        mutable.value = mutable.value.copy(launching = mutable.value.launching + game.id, message = null)
+        val connection = failure
+        fun stillCurrent() = current == epoch && endpoint === api && failure === connection
+        mutable.value = mutable.value.copy(commanding = mutable.value.commanding + game.id, message = null)
         scope.launch {
             try {
-                val result = org.json.JSONObject(String(api.bytes("/api/games/${validId(game.id)}/launch", saved.token, ""), Charsets.UTF_8))
-                if (current == epoch) mutable.value = mutable.value.copy(message = result.getString("message"))
+                val result = org.json.JSONObject(String(api.bytes("/api/games/${validId(game.id)}/$action", saved.token, ""), Charsets.UTF_8))
+                if (stillCurrent()) mutable.value = mutable.value.copy(message = result.getString("message"))
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
-                if (current == epoch) {
+                if (stillCurrent()) {
                     mutable.value = mutable.value.copy(message = when (e) {
                         is ApiError -> e.message
-                        else -> "Launch response lost. Check the PC before retrying; it may have launched."
+                        else -> "Command response lost. Check the PC before retrying; it may already have taken effect."
                     })
-                    if (e !is ApiError || e.code == 401) failure?.complete(Unit)
+                    if (e !is ApiError || e.code == 401) connection?.complete(Unit)
                 }
             } finally {
-                if (current == epoch) mutable.value = mutable.value.copy(launching = mutable.value.launching - game.id)
+                if (stillCurrent()) mutable.value = mutable.value.copy(commanding = mutable.value.commanding - game.id)
             }
         }
     }

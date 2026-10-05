@@ -271,21 +271,23 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
   });
   const initial = () => document.querySelector('.entry-card .overlay-play button') ||
     candidates().find((el) => el.closest('main')) || candidates()[0];
-  const jumpToEdge = (bottom) => {
+  const jumpByThird = (forward) => {
+    // Capture the card before closing a menu that might currently own focus.
+    const activeCard = document.activeElement.closest('.entry-card');
     closeMenus();
-    const controls = candidates().filter((el) => el.closest('main'));
-    const target = bottom ? controls[controls.length - 1] : controls[0];
-    if (target) {
-      document.body.classList.add('directional-navigation');
-      // Move focus without the usual nearest-card scroll fighting the page jump.
-      target.focus({ preventScroll: true });
-      contentFocus = target;
-    }
-    window.scrollTo({
-      left: window.scrollX,
-      top: bottom ? document.documentElement.scrollHeight : 0,
-      behavior: 'instant'
-    });
+    // Recompute in current DOM/filter/sort order, including cards below the viewport.
+    const entries = candidates().filter((el) => el.matches('main .entry-grid .entry-card .overlay-play button'));
+    if (!entries.length) return;
+    let index = entries.findIndex((el) => el.closest('.entry-card') === activeCard);
+    if (index < 0) index = entries.findIndex((el) => el.closest('.entry-card') === contentFocus?.closest('.entry-card'));
+    const step = Math.max(1, Math.ceil(entries.length / 3));
+    // With no current/remembered card, establish selection at the first entry.
+    const next = index < 0 ? 0 : Math.max(0, Math.min(entries.length - 1, index + (forward ? step : -step)));
+    const target = entries[next];
+    document.body.classList.add('directional-navigation');
+    target.focus({ preventScroll: true });
+    contentFocus = target;
+    target.closest('.entry-card').scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
   };
   const move = (direction) => {
     const active = document.activeElement;
@@ -415,11 +417,29 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
       heldDirection = null;
       return;
     }
-    // Standard-mapped shoulders: LB = top, RB = bottom, once per press.
-    const jumpTop = pressed.has(4) && !previous.has(4);
-    const jumpBottom = pressed.has(5) && !previous.has(5);
-    if (jumpTop || jumpBottom) {
-      jumpToEdge(!jumpTop);
+    // Standard-mapped triggers: previous/next dashboard category, once per squeeze.
+    // Use actual sidebar links; never let triggers leave an editor/settings page.
+    const categoryBack = pressed.has(6) && !previous.has(6);
+    const categoryForward = pressed.has(7) && !previous.has(7);
+    if ((categoryBack || categoryForward) && document.querySelector('[data-category-dashboard]')) {
+      const categories = Array.from(document.querySelectorAll('.sidebar a[data-category-nav]'));
+      const index = categories.findIndex((link) => link.getAttribute('aria-current') === 'page');
+      if (index >= 0) {
+        closeMenus();
+        const next = (index + (categoryBack ? -1 : 1) + categories.length) % categories.length;
+        // Disarm before navigation: holding a trigger must not cycle again on page load.
+        armed = false;
+        heldDirection = null;
+        previous = pressed;
+        categories[next].click();
+        return; // A or a shoulder pressed on this frame must not also activate/jump.
+      }
+    }
+    // Standard-mapped shoulders: jump one third backward/forward, once per press.
+    const jumpBack = pressed.has(4) && !previous.has(4);
+    const jumpForward = pressed.has(5) && !previous.has(5);
+    if (jumpBack || jumpForward) {
+      jumpByThird(!jumpBack);
       heldDirection = direction;
       nextMove = now + 350;
       // Do not also activate a newly focused control on the same frame.

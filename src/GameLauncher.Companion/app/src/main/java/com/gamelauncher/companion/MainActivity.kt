@@ -221,8 +221,10 @@ private fun PcPage(session: PcSession, reconnect: () -> Unit, remove: () -> Unit
                 TextButton(onClick = reconnect) { Text("Reconnect") }
                 TextButton(onClick = remove) { Text("Remove") }
             }
-            if (!ui.online && ui.games.isNotEmpty()) Text("Last known library • launch disabled", style = MaterialTheme.typography.bodySmall)
+            if (!ui.online && ui.games.isNotEmpty()) Text("Last known library • controls disabled", style = MaterialTheme.typography.bodySmall)
             ui.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp)) }
+            if (ui.games.any { !it.canTrackStatus }) Text("For shortcut/Steam games, set the actual game’s tracking executable in Windows Edit to enable Playing and Stop.",
+                style = MaterialTheme.typography.bodySmall, color = LauncherColors.Muted)
         }
         if (sorted.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -244,6 +246,24 @@ private fun GameCard(session: PcSession, ui: PcUi, game: Game) {
             value = try { session.cover(game) } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
         }
     }
+    var showStop by remember(session, game.id) { mutableStateOf(false) }
+    var confirmForce by remember(session, game.id) { mutableStateOf(false) }
+    val canStop = ui.online && game.canTrackStatus && game.status == "Running" && game.id !in ui.commanding
+    LaunchedEffect(canStop) { if (!canStop) { showStop = false; confirmForce = false } }
+    if (showStop && canStop) AlertDialog(
+        onDismissRequest = { showStop = false; confirmForce = false },
+        title = { Text(if (confirmForce) "Force stop ${game.name}?" else "Stop ${game.name}?") },
+        text = { Column {
+            Text(if (confirmForce) "Unsaved progress will be lost. This terminates only the tracked game process, not its child processes or bundled apps."
+                else "Ask the game to close normally. A save or exit dialog may still need your attention on the PC.")
+            if (!confirmForce) TextButton(onClick = { confirmForce = true }) { Text("Force stop instead…", color = MaterialTheme.colorScheme.error) }
+        } },
+        confirmButton = { TextButton(onClick = {
+            session.stopGame(game, force = confirmForce)
+            showStop = false
+            confirmForce = false
+        }) { Text(if (confirmForce) "Force stop" else "Close normally") } },
+        dismissButton = { TextButton(onClick = { showStop = false; confirmForce = false }) { Text("Cancel") } })
     val playing = game.status == "Running"
     // Only active states are shown; "Stopped" just means not running, so it gets no label.
     val badge = when (game.status) {
@@ -272,15 +292,15 @@ private fun GameCard(session: PcSession, ui: PcUi, game: Game) {
         Column(Modifier.padding(10.dp)) {
             Text(game.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
             // Windows .launch button: soft orange fill with a warm border rather than a solid accent block.
-            Button(onClick = { session.launch(game) }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+            Button(onClick = { if (canStop) showStop = true else session.launch(game) }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = LauncherColors.LaunchBg, contentColor = LauncherColors.LaunchText,
                     disabledContainerColor = LauncherColors.SurfaceRaised, disabledContentColor = LauncherColors.Muted),
                 border = BorderStroke(1.dp, LauncherColors.LaunchBorder),
-                enabled = ui.online && game.status == "Stopped" && game.id !in ui.launching) {
+                enabled = ui.online && game.id !in ui.commanding && (game.status == "Stopped" || canStop)) {
                 Text(when {
-                    game.id in ui.launching -> "Sending…"
-                    game.status == "Running" -> "Playing"
+                    game.id in ui.commanding -> "Sending…"
+                    game.status == "Running" -> "Stop game"
                     game.status == "Starting" -> "Starting…"
                     game.status == "Stopping" -> "Closing…"
                     else -> "Launch"
