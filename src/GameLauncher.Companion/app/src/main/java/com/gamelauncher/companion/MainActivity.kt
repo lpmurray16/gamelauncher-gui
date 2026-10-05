@@ -28,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -209,8 +211,11 @@ private fun PairDialog(model: CompanionModel, dismiss: () -> Unit) {
 @Composable
 private fun PcPage(session: PcSession, reconnect: () -> Unit, remove: () -> Unit) {
     val ui by session.state.collectAsStateWithLifecycle()
-    val sorted = remember(ui.games) { ui.games.sortedWith(compareBy<Game> { if (it.status == "Running") 0 else 1 }
-        .thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }) }
+    val sorted = remember(ui.games) { ui.games.sortedWith(compareBy<Game> { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }) }
+    val running = remember(sorted) { sorted.filter { it.status == "Running" || it.status == "Stopping" } }
+    var trayHeightPx by remember(session) { mutableStateOf(0) }
+    val density = LocalDensity.current
+    val traySpace = if (running.isEmpty()) 0.dp else with(density) { trayHeightPx.toDp() }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text(ui.device.name, style = MaterialTheme.typography.headlineSmall)
@@ -221,22 +226,60 @@ private fun PcPage(session: PcSession, reconnect: () -> Unit, remove: () -> Unit
                 TextButton(onClick = reconnect) { Text("Reconnect") }
                 TextButton(onClick = remove) { Text("Remove") }
             }
+            PcPowerControls(session, ui)
             if (!ui.online && ui.games.isNotEmpty()) Text("Last known library • controls disabled", style = MaterialTheme.typography.bodySmall)
             ui.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp)) }
             if (ui.games.any { !it.canTrackStatus }) Text("For shortcut/Steam games, set the actual game’s tracking executable in Windows Edit to enable Playing and Stop.",
                 style = MaterialTheme.typography.bodySmall, color = LauncherColors.Muted)
         }
-        if (sorted.isEmpty()) {
-            Box(Modifier.weight(1f).fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                Text(if (ui.online) "No games yet. Add games in the Windows launcher." else "Connect to this PC to load its library.")
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            if (sorted.isEmpty()) {
+                Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                    Text(if (ui.online) "No games yet. Add games in the Windows launcher." else "Connect to this PC to load its library.")
+                }
+            } else {
+                LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = traySpace + 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(sorted, key = { it.id }) { game -> GameCard(session, ui, game) }
+                }
+            }
+            if (running.isNotEmpty()) NowPlayingTray(session, ui, running,
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().onSizeChanged { trayHeightPx = it.height }.padding(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun PcPowerControls(session: PcSession, ui: PcUi) {
+    val power = ui.power ?: return
+    var confirmShutdown by remember(session) { mutableStateOf(false) }
+    val canShutdown = ui.online && power.remoteShutdownAllowed && !power.pending && !power.dispatching && !ui.powerBusy
+    LaunchedEffect(canShutdown) { if (!canShutdown) confirmShutdown = false }
+    if (confirmShutdown && canShutdown) AlertDialog(
+        onDismissRequest = { confirmShutdown = false },
+        title = { Text("Shut down ${ui.device.name}?") },
+        text = { Text("Starts a 15-second countdown on this PC. Save your work first. You can cancel during the countdown. Apps will not be forced closed and may block shutdown. Keep Launchpad running; once sent to Windows, this app cannot cancel it or confirm power-off.") },
+        confirmButton = { TextButton(onClick = { confirmShutdown = false; session.shutdownPc() }) { Text("Shut down PC") } },
+        dismissButton = { TextButton(onClick = { confirmShutdown = false }) { Text("Keep PC on") } })
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (power.pending) {
+            Text(if (ui.online) "Shutdown in ~${power.remainingSeconds}s" else "Shutdown may still be pending",
+                modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+            TextButton(enabled = ui.online && !ui.powerBusy, onClick = { session.shutdownPc(cancel = true) }) {
+                Text(if (ui.powerBusy) "Sending…" else "Cancel shutdown")
             }
         } else {
-            LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(sorted, key = { it.id }) { game -> GameCard(session, ui, game) }
+            TextButton(enabled = canShutdown, onClick = { confirmShutdown = true }) {
+                Text(if (ui.powerBusy) "Sending…" else "Shut down PC…")
             }
         }
     }
+    if (ui.online && !power.remoteShutdownAllowed && !power.pending)
+        Text("Enable ‘Allow remote PC shutdown’ in Windows Settings → PC power.", style = MaterialTheme.typography.bodySmall)
+    if (power.revision > 0) Text(if (ui.online) power.message else
+        "Power state is unconfirmed while offline. Check the PC; a lost connection does not prove shutdown or cancellation.",
+        style = MaterialTheme.typography.bodySmall)
 }
 
 @Composable
@@ -247,23 +290,9 @@ private fun GameCard(session: PcSession, ui: PcUi, game: Game) {
         }
     }
     var showStop by remember(session, game.id) { mutableStateOf(false) }
-    var confirmForce by remember(session, game.id) { mutableStateOf(false) }
     val canStop = ui.online && game.canTrackStatus && game.status == "Running" && game.id !in ui.commanding
-    LaunchedEffect(canStop) { if (!canStop) { showStop = false; confirmForce = false } }
-    if (showStop && canStop) AlertDialog(
-        onDismissRequest = { showStop = false; confirmForce = false },
-        title = { Text(if (confirmForce) "Force stop ${game.name}?" else "Stop ${game.name}?") },
-        text = { Column {
-            Text(if (confirmForce) "Unsaved progress will be lost. This terminates only the tracked game process, not its child processes or bundled apps."
-                else "Ask the game to close normally. A save or exit dialog may still need your attention on the PC.")
-            if (!confirmForce) TextButton(onClick = { confirmForce = true }) { Text("Force stop instead…", color = MaterialTheme.colorScheme.error) }
-        } },
-        confirmButton = { TextButton(onClick = {
-            session.stopGame(game, force = confirmForce)
-            showStop = false
-            confirmForce = false
-        }) { Text(if (confirmForce) "Force stop" else "Close normally") } },
-        dismissButton = { TextButton(onClick = { showStop = false; confirmForce = false }) { Text("Cancel") } })
+    LaunchedEffect(canStop) { if (!canStop) showStop = false }
+    if (showStop && canStop) StopGameDialog(session, game, dismiss = { showStop = false })
     val playing = game.status == "Running"
     // Only active states are shown; "Stopped" just means not running, so it gets no label.
     val badge = when (game.status) {

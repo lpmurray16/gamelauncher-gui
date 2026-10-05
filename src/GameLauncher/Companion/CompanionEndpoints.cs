@@ -59,9 +59,29 @@ public static class CompanionEndpoints
         }
     }
 
+    private static IResult PowerCommand(HttpContext context, PcPowerService power, CompanionAccess access, bool cancel)
+    {
+        if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
+            return Results.BadRequest(new CommandResponse("Power commands do not accept a request body."));
+        // Require the LAN bearer identity even if someone requests this route on the desktop listener.
+        if (context.Items[GenerationKey] is not long generation || !access.IsGenerationCurrent(generation))
+            return Results.Unauthorized();
+        try
+        {
+            // Paired phones may cancel a pending countdown even after remote scheduling is disabled.
+            return Results.Ok(cancel ? power.Cancel() : power.Schedule(generation));
+        }
+        catch (InvalidOperationException error) { return Results.Conflict(new CommandResponse(error.Message)); }
+    }
+
     public static void MapCompanion(this WebApplication app)
     {
         app.MapGet("/api/device", (CompanionAccess access) => access.Device);
+        app.MapGet("/api/power", (PcPowerService power) => power.Status());
+        app.MapPost("/api/power/shutdown", (HttpContext context, PcPowerService power, CompanionAccess access) =>
+            PowerCommand(context, power, access, cancel: false));
+        app.MapPost("/api/power/cancel", (HttpContext context, PcPowerService power, CompanionAccess access) =>
+            PowerCommand(context, power, access, cancel: true));
         app.MapPost("/api/pair", (PairingRequest request, CompanionAccess access) =>
         {
             var paired = access.Pair(request.Code);
@@ -75,7 +95,8 @@ public static class CompanionEndpoints
             var entries = await db.Entries.AsNoTracking().Where(x => x.Category == LibraryCategory.Games).ToListAsync(ct);
             return entries.OrderBy(x => x.Title, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Id).Select(x => new GameDto(
                 x.Id, x.Title, x.CoverImageFile is null ? null : $"/api/games/{x.Id:D}/cover?v={Uri.EscapeDataString(x.CoverImageFile)}",
-                monitor.GetStatus(x.Id), GameStatusMonitor.CanTrack(x))).ToArray();
+                monitor.GetStatus(x.Id), GameStatusMonitor.CanTrack(x),
+                x.HeroImageFile is null ? null : $"/api/games/{x.Id:D}/hero?v={Uri.EscapeDataString(x.HeroImageFile)}")).ToArray();
         });
         app.MapGet("/api/games/{id:guid}/cover", async (Guid id, IDbContextFactory<LibraryDbContext> factory, AppPaths paths, CancellationToken ct) =>
         {
@@ -85,6 +106,19 @@ public static class CompanionEndpoints
             try
             {
                 var (path, type) = Artwork.Resolve(paths, entry.CoverImageFile);
+                return Results.File(path, type);
+            }
+            catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+            { return Results.NotFound(); }
+        });
+        app.MapGet("/api/games/{id:guid}/hero", async (Guid id, IDbContextFactory<LibraryDbContext> factory, AppPaths paths, CancellationToken ct) =>
+        {
+            await using var db = await factory.CreateDbContextAsync(ct);
+            var entry = await db.Entries.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.Category == LibraryCategory.Games, ct);
+            if (entry?.HeroImageFile is null) return Results.NotFound();
+            try
+            {
+                var (path, type) = Artwork.Resolve(paths, entry.HeroImageFile);
                 return Results.File(path, type);
             }
             catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)

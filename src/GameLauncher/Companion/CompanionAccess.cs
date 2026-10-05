@@ -135,6 +135,21 @@ public sealed class CompanionAccess : IDisposable
         }
     }
 
+    public bool IsGenerationCurrent(long generation)
+    {
+        lock (_gate) return _enabled && _listeningPort.HasValue && generation == _generation;
+    }
+
+    public bool RunIfGenerationCurrent(long generation, Action action)
+    {
+        lock (_gate)
+        {
+            if (!_enabled || !_listeningPort.HasValue || generation != _generation) return false;
+            action();
+            return true;
+        }
+    }
+
     public bool RegisterConnection(string id, long generation, Action abort)
     {
         lock (_gate)

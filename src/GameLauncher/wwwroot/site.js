@@ -94,7 +94,34 @@ document.querySelectorAll("form[data-confirm]").forEach((form) => {
     if (!window.confirm(form.dataset.confirm)) event.preventDefault();
   });
 });
-// Standard POST forms own every mutation and antiforgery token. No fetch is needed.
+// Read-only power status; all desktop mutations remain antiforgery-protected POST forms.
+(() => {
+  const banner = document.querySelector('[data-power-banner]');
+  if (!banner) return;
+  const poll = async () => {
+    try {
+      const response = await fetch('/Power?handler=Status', { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+      if (!response.ok) throw new Error('Power status unavailable');
+      const state = await response.json();
+      const countdown = state.pending ? `Shutdown in approximately ${state.remainingSeconds} seconds.` : '';
+      banner.hidden = !state.pending;
+      banner.querySelector('[data-power-banner-text]').textContent = countdown + ' Save your work. Apps will not be forced closed.';
+      document.querySelectorAll('[data-power-message]').forEach((el) => { el.textContent = state.message; });
+      document.querySelectorAll('[data-power-countdown]').forEach((el) => { el.textContent = countdown; });
+      document.querySelectorAll('[data-power-start]').forEach((el) => { el.disabled = state.pending || state.dispatching; });
+      document.querySelectorAll('[data-power-cancel]').forEach((el) => { el.disabled = !state.pending; });
+    } catch {
+      // A disconnected window is not evidence that the machine powered off or cancellation succeeded.
+      document.querySelectorAll('[data-power-message]').forEach((el) => {
+        el.textContent = 'Power status unavailable. A previous countdown may still be active; cancellation is not confirmed.';
+      });
+      if (!banner.hidden) banner.querySelector('[data-power-banner-text]').textContent = 'Shutdown status unavailable. The countdown may still be active.';
+      document.querySelectorAll('[data-power-start]').forEach((el) => { el.disabled = true; });
+    } finally { window.setTimeout(poll, 1000); }
+  };
+  poll();
+})();
+// Standard POST forms own scanning mutations and antiforgery tokens.
 document.querySelectorAll("[data-scan-form]").forEach((form) => {
   const root = form.querySelector('input[name="Root"]');
   const picks = Array.from(form.querySelectorAll("[data-scan-folder]"));

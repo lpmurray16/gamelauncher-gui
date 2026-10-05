@@ -101,6 +101,8 @@ internal static class Program
         builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
         builder.Services.AddSignalR(options => options.MaximumReceiveMessageSize = 4096)
             .AddJsonProtocol(options => options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+        builder.Services.AddSingleton<PcPowerService>();
+        builder.Services.AddHostedService(services => services.GetRequiredService<PcPowerService>());
         builder.Services.AddSingleton<GameStatusMonitor>();
         builder.Services.AddHostedService(services => services.GetRequiredService<GameStatusMonitor>());
         builder.Services.Configure<FormOptions>(options => options.ValueCountLimit = 4096);

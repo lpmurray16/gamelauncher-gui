@@ -8,6 +8,7 @@
 <div asp-validation-summary="All" class="validation" role="alert"></div>
 <section class="panel">
     <h2>LAN access</h2>
+    <p><a asp-page="/Power">PC power preferences</a> — optionally allow paired phones to shut down this PC. Remote shutdown is off by default.</p>
     <p>Off by default. Enable only on a trusted home network. Pairing and commands currently use unencrypted HTTP: people able to inspect your network traffic could capture the pairing credential and launch your saved games.</p>
     <form method="post" asp-page-handler="Save">
         <label class="check-label"><input asp-for="Enabled" /> Enable Android companion access</label>

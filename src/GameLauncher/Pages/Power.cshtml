@@ -1,0 +1,33 @@
+@page
+@model PowerModel
+@{
+    ViewData["Title"] = "PC power";
+    ViewData["Section"] = "Settings";
+}
+<header class="page-heading"><div><p class="eyebrow">THIS COMPUTER</p><h1>PC power<span class="heading-dot">.</span></h1><p class="lede">@Model.ComputerName</p></div></header>
+<div asp-validation-summary="All" class="validation" role="alert"></div>
+<section class="panel" data-power-controls>
+    <h2>Shut down @Model.ComputerName</h2>
+    <p>Starts a 15-second countdown in Launchpad. Save your work first. Apps are not forced closed and may block Windows shutdown.</p>
+    <p data-power-message role="status">@Model.Status.Message</p>
+    <p data-power-countdown>@(Model.Status.Pending ? $"Shutdown in approximately {Model.Status.RemainingSeconds} seconds." : "")</p>
+    <div class="actions">
+        <form method="post" asp-page-handler="Shutdown" data-confirm="Shut down @Model.ComputerName in 15 seconds? Save your work first. You can cancel during the countdown; apps will not be forced closed.">
+            <button type="submit" class="button danger" data-power-start disabled="@(Model.Status.Pending || Model.Status.Dispatching)">Shut down PC…</button>
+        </form>
+        <form method="post" asp-page-handler="Cancel">
+            <button type="submit" class="button secondary" data-power-cancel disabled="@(!Model.Status.Pending)">Cancel shutdown</button>
+        </form>
+    </div>
+    <p class="helper">Keep Launchpad running during the countdown. Closing it cancels a countdown that has not yet been sent to Windows. After dispatch, Launchpad cannot cancel Windows shutdown or confirm the PC powered off.</p>
+</section>
+<section class="panel">
+    <h2>Companion permission</h2>
+    <form method="post" asp-page-handler="Permission">
+        <label class="check-label"><input asp-for="AllowRemoteShutdown" /> Allow remote PC shutdown</label>
+        <p class="helper">Off by default. Allows any phone paired to this PC to schedule shutdown. Companion HTTP is unencrypted: intercepted credentials can be used to control this PC. Enable only on a trusted private LAN. Disabling this permission, disabling companion access, or revoking pairings cancels a pending remote countdown.</p>
+        <button type="submit" class="button primary">Save power preferences</button>
+    </form>
+    <p class="helper">An authenticated paired phone can cancel a pending countdown, including one started locally. No shutdown commands are retried automatically.</p>
+    <div class="actions"><a class="button secondary" asp-page="/Companion">Manage companion access</a><a class="button secondary" asp-page="/Settings">Back to settings</a></div>
+</section>

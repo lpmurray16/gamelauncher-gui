@@ -35,6 +35,9 @@ WebView2/
 # OS
 Thumbs.db
 .DS_Store
-docs/WORKLOG.md
-docs/WORKLOG.md
-docs/WORKLOG.md
+# Local AI instructions, planning, and work logs (keep on disk, not in Git)
+AGENTS.md
+CLAUDE.md
+SKILL.md
+IDEA.md
+WORKLOG.md

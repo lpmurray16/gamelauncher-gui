@@ -19,7 +19,11 @@ import kotlin.coroutines.resumeWithException
 
 data class Device(val deviceId: String, val name: String, val version: String)
 data class SavedPc(val device: Device, val host: String, val port: Int, val token: String)
-data class Game(val id: String, val name: String, val coverUrl: String?, val status: String, val canTrackStatus: Boolean)
+data class Game(val id: String, val name: String, val coverUrl: String?, val status: String, val canTrackStatus: Boolean, val heroUrl: String? = null)
+data class PowerStatus(val remoteShutdownAllowed: Boolean, val pending: Boolean, val remainingSeconds: Int,
+    val dispatching: Boolean, val message: String, val revision: Long)
+fun parsePower(json: JSONObject) = PowerStatus(json.getBoolean("remoteShutdownAllowed"), json.getBoolean("pending"),
+    json.getInt("remainingSeconds"), json.getBoolean("dispatching"), json.getString("message"), json.getLong("revision"))
 // Java SignalR's Gson deserializer uses these public, default-initialized fields.
 class StatusEvent {
     @JvmField var gameId: String = ""
@@ -66,12 +70,17 @@ class LanEndpoint private constructor(val base: String, val client: OkHttpClient
             LanEndpoint("http://$ip:$port", client)
         }
     }
-    suspend fun bytes(path: String, token: String? = null, body: String? = null): ByteArray {
+    suspend fun bytes(path: String, token: String? = null, body: String? = null, timeoutSeconds: Long = 20): ByteArray {
         require(path.startsWith("/api/") && !path.contains("..") && !path.contains('#'))
         val builder = Request.Builder().url(base + path)
         if (token != null) builder.header("Authorization", "Bearer $token")
         if (body != null) builder.post(body.toRequestBody("application/json".toMediaType()))
-        return client.newCall(builder.build()).awaitBytes()
+        return client.newCall(builder.build()).apply { timeout().timeout(timeoutSeconds, TimeUnit.SECONDS) }.awaitBytes()
+    }
+    suspend fun power(token: String): PowerStatus? = try {
+        parsePower(JSONObject(String(bytes("/api/power", token, timeoutSeconds = 4), Charsets.UTF_8)))
+    } catch (e: ApiError) {
+        if (e.code == 404) null else throw e // Older PCs keep working without power controls.
     }
     suspend fun device() = parseDevice(JSONObject(String(bytes("/api/device"), Charsets.UTF_8)))
     suspend fun games(token: String): List<Game> {
@@ -82,7 +91,8 @@ class LanEndpoint private constructor(val base: String, val client: OkHttpClient
             require(status in statuses) { "Unsupported game status" }
             Game(validId(item.getString("id")), item.getString("name"),
                 if (item.isNull("coverUrl")) null else item.getString("coverUrl"),
-                status, item.getBoolean("canTrackStatus"))
+                status, item.getBoolean("canTrackStatus"),
+                if (item.isNull("heroUrl")) null else item.getString("heroUrl"))
         }.distinctBy { it.id }
     }
 }

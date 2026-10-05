@@ -75,6 +75,13 @@
         {
             <div class="notice toast" role="status" data-toast>@notice</div>
         }
+        <section class="notice" data-power-banner hidden>
+            <p data-power-banner-text role="status"></p>
+            <div class="actions">
+                <form method="post" asp-page="/Power" asp-page-handler="Cancel"><button type="submit" class="button secondary">Cancel shutdown</button></form>
+                <a class="button secondary" asp-page="/Power">PC power</a>
+            </div>
+        </section>
         @RenderBody()
         <p class="navigation-hint">Navigate: arrows / D-pad · Select: Enter / A · Options: Shift+F10 / X · Back: Esc / B · Sidebar: F1 / View · Jump ⅓ back / forward: LB / RB · Category: L2 / R2 (LT / RT) · Favorite: Y (controller) · Windows keyboard: A on a text field / F2 · Fullscreen: F11</p>
         <footer class="page-footer">Less searching. More playing.<span>GAME LAUNCHER / LOCAL LIBRARY</span></footer>

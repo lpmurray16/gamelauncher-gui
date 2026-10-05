@@ -52,6 +52,18 @@ The non-elevated uninstaller cannot remove an administrator-created firewall rul
 - The Android app permits cleartext for manually entered LAN hosts because Android's static domain configuration cannot enumerate arbitrary user IPs. Its networking layer restricts destinations and disables credential-bearing redirects. This permission applies to this application only, not other apps/device-wide networking.
 - Remote launch accepts only a GUID in the route and no request body. The existing `LibraryService.LaunchAsync` resolves paths/arguments/bundles from SQLite and uses existing validation and `UseShellExecute` behavior. API errors do not disclose Windows filesystem paths.
 
+## PC power (source-reviewed increment)
+
+Windows **Settings → PC power** provides confirmed shutdown with a **15-second** countdown, cancellation, and **Allow remote PC shutdown** (default off). The opt-in is persisted as `HKCU\Software\GameLauncher\Power\AllowRemoteShutdown`; saving reads it back. Permission changes take effect without restarting. The shared singleton/hosted service owns a single monotonic countdown. Repeated schedule requests during a pending countdown do not extend it. Windows pages poll read-only `/Power?handler=Status` and show a global cancellable banner; local POSTs retain shell authentication and Razor antiforgery.
+
+Authenticated native power commands accept no body or arbitrary command/path/timeout. Remote scheduling requires the opt-in and current pairing generation, rechecked through dispatch; disabling LAN or rotating pairings invalidates pending remote requests. Paired phones may cancel a pending local or remote countdown even without scheduling permission. The countdown is not tied to the HTTP request or phone connection: losing Wi-Fi, pausing/removing the phone, or closing the phone app does **not** cancel it. Closing Windows Launchpad cancels undispatched countdowns. Long timer stalls beyond the countdown plus 15 seconds cancel rather than execute a stale shutdown.
+
+After countdown expiry, the service invokes only system-directory `shutdown.exe /s /t 0`, with no `/f`, shell, elevation or configurable arguments. [Microsoft documents](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/shutdown) that a positive `/t` implies forced closing; therefore the countdown runs in Launchpad, not `shutdown.exe`. Cancel only clears Launchpad's pending countdown; it never issues `/a` against unrelated OS shutdowns. Once sent, Windows may block shutdown on apps/policy; UI reports request acceptance, never confirmed power-off. Exit failures are visible in power status. No automatic retries, restart, sleep or Wake-on-LAN.
+
+Android mirrors power JSON and polls once per second while connected, with four-second network deadlines for power requests, revision filtering and per-connection guards. Older servers returning 404 for `/api/power` retain game functionality without power controls. The UI confirms the selected PC's name and 15-second countdown, disables controls offline and reports uncertain results. LAN HTTP remains unencrypted; enabling shutdown expands the impact of an intercepted token. Use only a trusted LAN.
+
+Owner checks (not executed): rebuild both apps; default-off remote refusal, opt-in persistence, Windows and phone confirmation cancellation, countdown cancellation from either client, duplicate scheduling, late cancellation conflict, pairing revocation/permission-off cancellation, offline/pause/resume, two-PC targeting, old-server fallback, stale responses, antiforgery/missing token/unexpected-body rejection, Windows policy errors and app-blocked shutdown. First exercise scheduling and **cancel well before expiry**; only allow expiry with saved work when ready to shut down. Existing installer/APK does not include this unbuilt increment.
+
 ## Process tracking
 
 The monitor samples configured executable identities approximately every two seconds and emits only actual status changes. It recognizes matching processes regardless of who launched them. `.exe` targets work by exact full-path matching; shortcuts and bootstrap launchers need the optional **tracking executable** in the local Edit entry form. That path is tracking metadata only, never a new launch command. No process is executed to scan/detect it.
@@ -68,14 +80,18 @@ Shared C# DTOs: `src/GameLauncher.Contracts/CompanionContracts.cs`. Kotlin mirro
 |---|---|---|
 | `GET /api/device` | None | `{deviceId,name,version,protocolVersion:1}` |
 | `POST /api/pair` body `{code}` | One-time code | `{device:{...},token}`; 401 if invalid/expired |
-| `GET /api/games` | Bearer | Array of `{id,name,coverUrl,status,canTrackStatus}`; Games category only |
-| `GET /api/games/{id}/cover` | Bearer | Stored image; 404 when absent |
+| `GET /api/games` | Bearer | Array of `{id,name,coverUrl,status,canTrackStatus,heroUrl}`; Games category only |
+| `GET /api/games/{id}/cover` | Bearer | Stored cover image; 404 when absent |
+| `GET /api/games/{id}/hero` | Bearer | Stored hero/background image for the Now playing tray; 404 when absent or not a Games entry |
 | `POST /api/games/{id}/launch` no body | Bearer | `{message}`; 404 unknown/non-game, 409 rejected launch, 400 unexpected body |
 | `POST /api/games/{id}/stop` no body | Bearer | `{message}`; normal main-window close request; 404 unknown/non-game, 409 unsafe/unavailable, 400 unexpected body |
 | `POST /api/games/{id}/force-stop` no body | Bearer | Same validation; terminates only the exact matched process, not its tree; Android requires explicit confirmation |
+| `GET /api/power` | Bearer | `{remoteShutdownAllowed,pending,remainingSeconds,dispatching,message,revision}`; revision resets when Windows Launchpad restarts |
+| `POST /api/power/shutdown` no body | Bearer + remote opt-in | Power status after scheduling; 409 disabled/unavailable, 400 unexpected body |
+| `POST /api/power/cancel` no body | Bearer | Power status after cancellation; 409 no cancellable countdown, 400 unexpected body |
 | `/hubs/games` | Bearer, native WebSocket | `GameStatusChanged` payload `{gameId,status,revision}` |
 
-`coverUrl` is relative to the paired PC, includes a cache-version value, and is null without artwork. It never contains an absolute Windows path. SignalR revision increases during a Windows process lifetime and resets on restart. It orders events, not persistent database versions. Clients resynchronize on a new connection. The hub has no command methods. Metadata/library changes use periodic REST refresh in this MVP; no `LibraryChanged` event is promised.
+`coverUrl` and optional `heroUrl` are relative to the paired PC, include cache-version values, and are null without their respective artwork. They never contain absolute Windows paths. Android restricts credential-bearing image requests to the exact game's `/cover` or `/hero` route, caps downloads at 8 MiB, and downsamples decoded images. Missing `heroUrl` from an older server is accepted. The floating per-PC Now playing tray uses hero/background artwork with loading/empty fallback, multiple-game selectors and shared Stop confirmation. The library stays alphabetical; grid bottom padding follows measured tray height. Offline tray state is labelled last-known, with controls disabled. SignalR revision increases during a Windows process lifetime and resets on restart. It orders events, not persistent database versions. Clients resynchronize on a new connection. The hub has no command methods. Metadata/library changes use periodic REST refresh in this MVP; no `LibraryChanged` event is promised.
 
 ## QR pairing format v1
 
@@ -101,7 +117,7 @@ These checks have not been executed by the assistant. No test suite is added.
 - QR: scan and pair without typing; choose a different adapter without changing the code; check a saved-port change still encodes the active port; let a code expire and generate another. Confirm manual entry works after camera denial/cancellation. Check malformed/foreign QR rejection, leading-zero codes, wrong device identity, phone rotation/scanner return, and narrow Windows layout. QR contents and rendered camera readability have not been runtime-verified.
 - Unknown GUID gives 404; launch body is rejected; launching a known game honors the same stored options and bundles as Windows UI.
 - Stop increment: rebuild both apps; try a direct executable, then a Steam/shortcut entry with its actual game tracking executable configured. Confirm normal close, a game exit dialog remaining open, cancelled Force stop, confirmed Force stop on a disposable unsaved session, and Playing clearing only after observed exit. Check Steam and bundled apps remain running. Check offline/pause/resume, lost response (no automatic retry), elevated/inaccessible processes, multiple same-path instances, untracked shortcut, stale running status, unknown/non-game IDs, missing/invalid auth, and unexpected request bodies. No picker or automatic executable discovery is included.
-- Start/exit a tracked game from Windows, Android and manually; observe Playing/reordering and exit transitions without repeated unchanged events. Check untracked shortcut explanation and overridden tracking paths.
+- Start/exit a tracked game from Windows, Android and manually; observe Playing/tray appearance and exit transitions without grid reordering without repeated unchanged events. Check untracked shortcut explanation and overridden tracking paths.
 - Pair two PCs and confirm their libraries/status/artwork remain independent. Remove/reconnect one without affecting the other.
 - Turn Wi-Fi off/on, close/reopen Windows, background/resume Android, and revoke pairings while connected. Offline computers stay saved, launch does not auto-retry, and REST refresh recovers missed status events.
 - Change a PC address and pair it again: same GUID updates its endpoint. Change port/restart; verify old firewall rule removal and new restricted rule.

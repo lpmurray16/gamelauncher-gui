@@ -91,10 +91,21 @@ In **Edit entry → Bundled launch group**, select up to eight existing library 
 The optional native Android app supports QR/manual pairing, multiple PCs, game covers, launch commands and live process status. See [setup/security](docs/companion.md) and the [Android README](src/GameLauncher.Companion/README.md). It is built separately in Android Studio and is **not included in the Windows installer**.
 
 - Enable companion access on Windows and pair only over a trusted private LAN. HTTP is unencrypted; never expose the port to the internet. Protected commands require the paired bearer credential.
+- **Companion Now playing tray (new source increment):** running games appear in a floating bottom tray with their hero/background artwork and Stop controls, while the library stays alphabetical. Multiple active games have Previous/Next selectors; missing backgrounds use a placeholder. Rebuild both apps for the new background-image endpoint. This UI has not been rendered/tested by the assistant and is not in the existing installer/APK.
 - Running tracked games offer **Stop game → Close normally**. A game may show a save/exit dialog on the PC. **Force stop instead…** requires a separate unsaved-progress confirmation.
 - Stopping targets one exact executable match in the launcher's Windows session—not a process tree or bundled apps. Inaccessible/ambiguous matches are refused; Steam and Launchpad themselves are explicitly blocked. Administrator-run/protected games may require closing on the PC. Playing clears based on observed exit, not request acceptance.
 - For shortcuts, Steam URLs or bootstrap launchers, set **Edit entry → Status tracking executable** to the actual game's `.exe`. Leave the shortcut as the launch target. A running-process picker and automatic executable discovery are not implemented.
 - Both sides need the updated code for Stop controls; this Windows build does not rebuild or replace an existing Android APK. No remote keyboard/UAC approval is implemented.
+
+## PC shutdown (new source increment; not in the existing 1.5.1 installer)
+
+Open **Settings → PC power → Shutdown & power preferences** to request shutdown after a **15-second cancellable countdown**. Confirmation names the PC. A countdown banner appears across Windows pages with a Cancel shutdown button.
+
+For Android, first enable **Allow remote PC shutdown** on that Windows page (off by default), then use **Shut down PC…** on the paired PC's page. Any authenticated paired phone can cancel a pending countdown, including a locally started one. Both apps need rebuilding; no installer/APK was rebuilt for this increment.
+
+The countdown runs in Launchpad, which must remain open. Disconnecting/backgrounding the phone does not cancel it. Disabling remote permission, disabling companion access or revoking pairing cancels a pending remote countdown. Closing Launchpad cancels undispatched countdowns. After dispatch, cancellation through Launchpad is no longer available. Shutdown requests are not retried automatically; a lost connection does not prove power-off or cancellation.
+
+At expiry, Launchpad invokes the fixed Windows shutdown action with no force flag. Windows policy or unsaved apps may block shutdown. Save your work first. Restart, sleep and Wake-on-LAN are not part of this increment. Source-reviewed only; no shutdown command, build or runtime walkthrough was executed by the assistant.
 
 ## Artwork storage
 

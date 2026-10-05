@@ -13,6 +13,12 @@
     <a class="button secondary" asp-page="/Companion">Manage companion access</a>
 </section>
 
+<section class="panel">
+    <h2>PC power</h2>
+    <p>Shut down this PC with a cancellable 15-second countdown. Remote shutdown is separately opt-in.</p>
+    <a class="button secondary" asp-page="/Power">Shutdown &amp; power preferences</a>
+</section>
+
 <section class="panel" id="browser">
     <div class="panel-heading"><span class="step-number" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="4" ry="9" /><path d="M3 12h18" /></svg></span><div><h2>Browser shortcut</h2><p>Open your browser from the globe button on any page.</p></div></div>
     @if (!string.IsNullOrWhiteSpace(Model.BrowserExecutable))

@@ -7,6 +7,8 @@ public enum GameStatus { Stopped, Starting, Running, Stopping }
 public sealed record DeviceInfoDto(Guid DeviceId, string Name, string Version, int ProtocolVersion = 1);
 public sealed record PairingRequest(string Code);
 public sealed record PairingResponse(DeviceInfoDto Device, string Token);
-public sealed record GameDto(Guid Id, string Name, string? CoverUrl, GameStatus Status, bool CanTrackStatus);
+public sealed record GameDto(Guid Id, string Name, string? CoverUrl, GameStatus Status, bool CanTrackStatus, string? HeroUrl = null);
 public sealed record GameStatusChangedDto(Guid GameId, GameStatus Status, long Revision);
 public sealed record CommandResponse(string Message);
+public sealed record PowerStatusDto(bool RemoteShutdownAllowed, bool Pending, int RemainingSeconds,
+    bool Dispatching, string Message, long Revision);
