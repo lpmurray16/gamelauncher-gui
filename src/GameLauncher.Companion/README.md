@@ -1,4 +1,4 @@
-# Game Launcher — Android companion
+# Launchpad — Android companion
 
 Native Kotlin / Jetpack Compose companion with QR and manual pairing. Open **this directory** in Android Studio; it is a separate Gradle project, not a .NET solution project. There is no fake library, bundled credential, discovery service, or test scaffold.
 

@@ -26,7 +26,7 @@ internal static class Program
         using var instance = new Mutex(true, @"Local\GameLauncher.Desktop", out var firstInstance);
         if (!firstInstance)
         {
-            MessageBox.Show("Game Launcher is already running. Look for its open window.", "Game Launcher");
+            MessageBox.Show("Launchpad is already running. Look for its open window.", "Launchpad");
             return;
         }
 
@@ -58,7 +58,7 @@ internal static class Program
         catch (Exception ex)
         {
             TryLog(paths, ex);
-            MessageBox.Show($"Game Launcher could not start.\n\n{ex.Message}\n\nDetails: {paths?.LogPath ?? "Application data folder unavailable"}",
+            MessageBox.Show($"Launchpad could not start.\n\n{ex.Message}\n\nDetails: {paths?.LogPath ?? "Application data folder unavailable"}",
                 "Startup error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
@@ -161,7 +161,7 @@ internal static class Program
                 !CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(supplied), expected))
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await context.Response.WriteAsync("Open this library from the Game Launcher desktop window.");
+                await context.Response.WriteAsync("Open this library from the Launchpad desktop window.");
                 return;
             }
             context.Response.Headers["Content-Security-Policy"] =
@@ -179,7 +179,7 @@ internal static class Program
             context.Response.StatusCode = StatusCodes.Status500InternalServerError;
             if (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/hubs"))
             {
-                await context.Response.WriteAsJsonAsync(new GameLauncher.Contracts.CommandResponse("The PC could not complete the request. Check Game Launcher on Windows."));
+                await context.Response.WriteAsJsonAsync(new GameLauncher.Contracts.CommandResponse("The PC could not complete the request. Check Launchpad on Windows."));
                 return;
             }
             context.Response.ContentType = "text/html; charset=utf-8";

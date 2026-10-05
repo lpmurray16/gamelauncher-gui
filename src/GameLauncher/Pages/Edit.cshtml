@@ -39,5 +39,5 @@
 </form>
 @if (Model.Id.HasValue)
 {
-    <section class="panel danger-panel"><h2>Remove from library</h2><p>This only removes the entry from Game Launcher. It does not delete or uninstall any files.</p><form method="post" asp-page-handler="Delete"><input asp-for="Id" type="hidden" id="delete-id" /><label class="check-label"><input asp-for="ConfirmRemoval" required /> I want to remove this library entry.</label><button class="button danger" type="submit">Remove entry</button></form></section>
+    <section class="panel danger-panel"><h2>Remove from library</h2><p>This only removes the entry from Launchpad. It does not delete or uninstall any files.</p><form method="post" asp-page-handler="Delete"><input asp-for="Id" type="hidden" id="delete-id" /><label class="check-label"><input asp-for="ConfirmRemoval" required /> I want to remove this library entry.</label><button class="button danger" type="submit">Remove entry</button></form></section>
 }

@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" tools:replace="android:required" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
-    <application android:label="Game Launcher" android:allowBackup="false"
+    <application android:label="Launchpad" android:allowBackup="false"
         android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules"
         android:usesCleartextTraffic="true" android:supportsRtl="true" android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"

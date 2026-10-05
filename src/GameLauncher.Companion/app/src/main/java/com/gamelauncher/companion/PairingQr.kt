@@ -41,7 +41,7 @@ data class PairingQr(val host: String, val port: Int, val code: String, val devi
             }
             require(seen == stringFields + integerFields) { "Incomplete pairing QR" }
             require(strings.getValue("format") == "gamelauncher-pair" && integers.getValue("formatVersion") == 1) {
-                "Not a supported Game Launcher pairing QR"
+                "Not a supported Launchpad pairing QR"
             }
             require(integers.getValue("protocolVersion") == 1) { "This PC uses an unsupported protocol" }
             val host = strings.getValue("host")

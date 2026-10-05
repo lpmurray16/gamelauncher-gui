@@ -37,7 +37,7 @@
     <div class="panel-heading"><span class="step-number" aria-hidden="true">↗</span><div><h2>Startup &amp; display</h2><p>Make this your first stop when you sign in, or open straight into a fullscreen library.</p></div></div>
     <form method="post" asp-page-handler="Startup" data-busy-form data-busy-label="Saving…">
         <label class="check-label"><input asp-for="StartWithWindows" /> Start with Windows</label>
-        <p class="helper">Register Game Launcher to open when you sign in to this Windows account. No administrator access is needed. Windows Settings → Apps → Startup can still disable it; this checkbox shows registration, not Windows' enabled/disabled override.</p>
+        <p class="helper">Register Launchpad to open when you sign in to this Windows account. No administrator access is needed. Windows Settings → Apps → Startup can still disable it; this checkbox shows registration, not Windows' enabled/disabled override.</p>
         <p class="helper">This uses the current GameLauncher.exe location. Enable it from your permanent installed copy, not a temporary build folder. If you move the app, save this setting again from its new location. Turn it off before deleting a standalone copy.</p>
         <button type="submit" class="button secondary">Save startup preference</button>
     </form>
@@ -108,6 +108,6 @@
             </div>
         }
     </dl>
-    <p class="helper">To make a backup, close Game Launcher before copying its data directory. Removing a library entry never removes the executable itself.</p>
+    <p class="helper">To make a backup, close Launchpad before copying its data directory. Removing a library entry never removes the executable itself.</p>
 </section>
 <section class="panel"><h2>What this version supports</h2><div class="capability-grid"><div><span class="capability-label">AVAILABLE</span><h3>Your launch files, organized</h3><p>Launch games, emulator executables and tools with custom arguments and working directories. Search, favorite, import from folder scans, and assign covers and background images.</p></div><div><span class="capability-label muted">NOT YET IMPLEMENTED</span><h3>No hidden integrations</h3><p>Metadata descriptions, genres, cloud sync and emulator ROM profiles are not included. Storefront accounts are not connected.</p></div></div></section>

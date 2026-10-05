@@ -98,7 +98,7 @@ public sealed class CompanionAccess : IDisposable
         lock (_gate)
         {
             if (!_enabled || !_listeningPort.HasValue)
-                throw new InvalidOperationException("Enable the companion server and restart Game Launcher before pairing.");
+                throw new InvalidOperationException("Enable the companion server and restart Launchpad before pairing.");
             _code = RandomNumberGenerator.GetInt32(100000000).ToString("D8", CultureInfo.InvariantCulture);
             _codeExpiry = DateTimeOffset.UtcNow.AddMinutes(2);
             _attempts = 0;

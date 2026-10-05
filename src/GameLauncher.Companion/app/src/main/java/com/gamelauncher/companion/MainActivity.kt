@@ -68,7 +68,7 @@ private fun CompanionApp(model: CompanionModel) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Image(painterResource(R.drawable.brand_mark), contentDescription = null, modifier = Modifier.height(28.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("Game Launcher", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text("Launchpad", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 TextButton(onClick = { model.pairingError.value = null; showPair = true }, enabled = storageError == null) { Text("Add PC") }
             }
             if (storageError != null) {
@@ -150,7 +150,7 @@ private fun PairDialog(model: CompanionModel, dismiss: () -> Unit) {
                 scanMessage = null
             } catch (_: Exception) {
                 // Do not display/log the raw payload or parser exception (it can contain the code).
-                scanMessage = "Not a valid supported Game Launcher pairing QR. Scan a fresh QR from Windows, or enter manually."
+                scanMessage = "Not a valid supported Launchpad pairing QR. Scan a fresh QR from Windows, or enter manually."
             }
         }
     }
@@ -270,7 +270,7 @@ private fun GameCard(session: PcSession, ui: PcUi, game: Game) {
             }
         }
         Column(Modifier.padding(10.dp)) {
-            Text(game.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+            Text(game.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
             // Windows .launch button: soft orange fill with a warm border rather than a solid accent block.
             Button(onClick = { session.launch(game) }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                 shape = RoundedCornerShape(8.dp),

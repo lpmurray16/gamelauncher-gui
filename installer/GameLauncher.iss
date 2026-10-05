@@ -2,7 +2,7 @@
 #ifndef AppVersion
   #define AppVersion "1.0.0"
 #endif
-#define AppName "Game Launcher"
+#define AppName "Launchpad"
 #define PublishDir SourcePath + "..\artifacts\publish\win-x64"
 
 [Setup]

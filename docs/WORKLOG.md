@@ -19,6 +19,15 @@ Handoff log for agents/models continuing this work. Newest first. Keep entries s
 
 ## Log
 
+### Launchpad display branding (source-reviewed only)
+- The user-facing name of both apps is **Launchpad**. Updated Android launcher label/header, Windows window/page titles, visible messages/product metadata, and installer display/shortcut names.
+- Internal GameLauncher assembly/executable/package IDs, registry/data paths, installer AppId and pairing format remain unchanged for compatibility. Existing installed shortcuts may retain their previous name until updated; installer upgrades have not been exercised.
+- Source-reviewed only; no builds, installs or launches performed.
+
+### Single-line card titles (source-reviewed only)
+- Changed the title below each Android game cover to one line with trailing ellipsis so long titles cannot add a second line and increase card height. The cover placeholder is unchanged because it stays inside the fixed-aspect cover area.
+- Source-reviewed only; no build or launch performed. Owner should rebuild Android and confirm short/long titles align on the phone.
+
 ### QR-pairing increment — Windows and Android implemented (source-reviewed only)
 - **Windows:** added local PNG QR generation with pinned QRCoder 1.6.0 (MIT). Pair POST emits a versioned JSON payload using the active listener port and the existing one-time code; no token, CDN, external QR service, or new endpoint.
 - **Network selection:** IPv4 addresses now carry adapter names. Active Wi-Fi/Ethernet with an IPv4 gateway sorts first as a suggestion; the user can change the QR address without generating another code. Virtual adapters can still be suggested, so the UI explicitly calls this a best guess.

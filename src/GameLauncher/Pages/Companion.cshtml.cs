@@ -35,7 +35,7 @@ public sealed class CompanionModel(CompanionAccess access) : UiPageModel
         {
             access.SaveSettings(Enabled, Port);
             TempData["Notice"] = Enabled
-                ? "Companion preferences saved. Restart Game Launcher after enabling or changing the port."
+                ? "Companion preferences saved. Restart Launchpad after enabling or changing the port."
                 : "Companion access disabled and live connections closed. Restart to close the listening socket.";
             return RedirectToPage();
         }

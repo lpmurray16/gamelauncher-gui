@@ -37,7 +37,7 @@ internal sealed class LauncherWindow : Form
         _paths = paths;
         _desktop = desktop;
         _keyboardMonitor.Tick += (_, _) => MonitorTouchKeyboard();
-        Text = "Game Launcher";
+        Text = "Launchpad";
         StartPosition = FormStartPosition.CenterScreen;
         Size = new Size(1320, 880);
         MinimumSize = new Size(820, 600);
@@ -144,7 +144,7 @@ internal sealed class LauncherWindow : Form
             {
                 _status.Visible = !args.IsSuccess;
                 if (args.IsSuccess) SendWindowState();
-                if (!args.IsSuccess) _status.Text = "The library could not load. Close and reopen Game Launcher.";
+                if (!args.IsSuccess) _status.Text = "The library could not load. Close and reopen Launchpad.";
             };
             core.Navigate(_origin.AbsoluteUri);
         }
@@ -152,7 +152,7 @@ internal sealed class LauncherWindow : Form
         {
             Program.TryLog(_paths, ex);
             MessageBox.Show(this,
-                "Microsoft Edge WebView2 Runtime is required. Install the Evergreen Runtime from Microsoft's official WebView2 download page, then reopen Game Launcher.\n\nhttps://developer.microsoft.com/microsoft-edge/webview2/",
+                "Microsoft Edge WebView2 Runtime is required. Install the Evergreen Runtime from Microsoft's official WebView2 download page, then reopen Launchpad.\n\nhttps://developer.microsoft.com/microsoft-edge/webview2/",
                 "WebView2 Runtime needed", MessageBoxButtons.OK, MessageBoxIcon.Information);
             Close();
         }

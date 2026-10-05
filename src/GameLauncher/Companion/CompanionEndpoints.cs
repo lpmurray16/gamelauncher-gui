@@ -37,7 +37,7 @@ public static class CompanionEndpoints
             if (!access.Authenticate(request.Headers.Authorization.ToString(), out var generation))
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                await context.Response.WriteAsJsonAsync(new CommandResponse("Pair this phone with Game Launcher again."), context.RequestAborted);
+                await context.Response.WriteAsJsonAsync(new CommandResponse("Pair this phone with Launchpad again."), context.RequestAborted);
                 return;
             }
             context.Items[GenerationKey] = generation;

@@ -10,7 +10,7 @@
     <Version>1.0.1</Version>
     <AssemblyVersion>1.0.1.0</AssemblyVersion>
     <FileVersion>1.0.1.0</FileVersion>
-    <Product>Game Launcher</Product>
+    <Product>Launchpad</Product>
     <Description>A local game, emulator, and tool launcher for Windows.</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>GameLauncher.ico</ApplicationIcon>
