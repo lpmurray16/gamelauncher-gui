@@ -28,7 +28,7 @@ public sealed class PowerModel(PcPowerService power) : UiPageModel
         {
             power.SetRemotePermission(AllowRemoteShutdown);
             TempData["Notice"] = AllowRemoteShutdown
-                ? "Paired phones may now request PC shutdown. Use only a trusted private network."
+                ? "Launchpad Companion on paired phones may now request PC shutdown. Use only a trusted private network."
                 : "Remote shutdown disabled. Any remote countdown was cancelled.";
             return RedirectToPage();
         }

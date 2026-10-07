@@ -67,7 +67,7 @@ public sealed class PcPowerService : BackgroundService
         {
             if (_stopped) throw new InvalidOperationException("Launchpad is closing; no shutdown was scheduled.");
             if (remoteGeneration.HasValue && (!_allowRemote || !_access.IsGenerationCurrent(remoteGeneration.Value)))
-                throw new InvalidOperationException("Remote shutdown is disabled or pairing changed. Enable it in Windows Settings → PC power.");
+                throw new InvalidOperationException("Shutdown from Launchpad Companion is disabled or pairing changed. On your PC, open Launchpad → Settings → PC power, enable ‘Allow shutdown from Launchpad Companion’, and select ‘Save power preferences’. If already enabled, pair Launchpad Companion again.");
             ValidatePending();
             if (_dispatching) throw new InvalidOperationException("A shutdown request is already being sent to Windows.");
             // Repeated requests never reset or extend an existing countdown.

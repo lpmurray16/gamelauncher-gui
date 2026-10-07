@@ -11,9 +11,7 @@
 }
 <header class="page-heading" data-category-dashboard>
     <div>
-        <p class="eyebrow">READY WHEN YOU ARE</p>
         <h1>@ViewData["Title"]<span class="heading-dot">.</span></h1>
-        <p class="lede">@(Model.Category == LibraryCategory.Emulators ? "Your emulator executables, in one place. ROM profiles are not supported yet." : Model.Category == LibraryCategory.Tools ? "The utilities that keep your setup running." : "Everything you play. One place to launch.")</p>
     </div>
     <div class="actions">
         <a class="button secondary" asp-page="/Scan" asp-route-category="@Model.Category">Scan a folder</a>
@@ -87,12 +85,12 @@
 
 @if (Model.Entries.Count == 0)
 {
-    <section class="empty-state"><div class="empty-symbol" aria-hidden="true">▦</div><p class="eyebrow">MAKE IT YOURS</p><h2>@(!string.IsNullOrWhiteSpace(Model.Search) ? "No matching entries" : activeSet is not null ? $"Nothing in {activeSet.Name} yet" : Model.Favorites ? "Your favorites start here" : "A clean slate. A great setup.")</h2><p>@(!string.IsNullOrWhiteSpace(Model.Search) ? "Try another search or return to the full category." : activeSet is not null ? "Open a game's options menu and choose Add to… to put it in this set." : Model.Favorites ? "Select the star on an entry to keep it close at hand." : "Add an executable or scan a folder to bring your local library together.")</p><div class="actions"><a class="button secondary" asp-page="/Index" asp-route-category="@Model.Category">View all entries</a><a class="button primary" asp-page="/Scan" asp-route-category="@Model.Category">Scan a folder <span aria-hidden="true">↗</span></a></div></section>
+    <section class="empty-state" data-library-touch><div class="empty-symbol" aria-hidden="true">▦</div><p class="eyebrow">MAKE IT YOURS</p><h2>@(!string.IsNullOrWhiteSpace(Model.Search) ? "No matching entries" : activeSet is not null ? $"Nothing in {activeSet.Name} yet" : Model.Favorites ? "Your favorites start here" : "A clean slate. A great setup.")</h2><p>@(!string.IsNullOrWhiteSpace(Model.Search) ? "Try another search or return to the full category." : activeSet is not null ? "Open a game's options menu and choose Add to… to put it in this set." : Model.Favorites ? "Select the star on an entry to keep it close at hand." : "Add an executable or scan a folder to bring your local library together.")</p><div class="actions"><a class="button secondary" asp-page="/Index" asp-route-category="@Model.Category">View all entries</a><a class="button primary" asp-page="/Scan" asp-route-category="@Model.Category">Scan a folder <span aria-hidden="true">↗</span></a></div></section>
 }
 else
 {
     <div class="section-label"><span>@Model.Entries.Count ENTRIES IN VIEW</span><span>@Model.SortLabel</span></div>
-    <section class="entry-grid" aria-label="Library entries">
+    <section class="entry-grid" data-library-touch aria-label="Library entries">
     @foreach (var entry in Model.Entries)
     {
         <article class="entry-card">

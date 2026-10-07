@@ -1,6 +1,8 @@
 @inject GameLauncher.Services.BrowserLauncher Browser
+@inject GameLauncher.Services.PcPowerService Power
 @{
     var active = ViewData["Section"] as string ?? "Games";
+    var powerStatus = Power.Status();
     var hasBrowser = false;
     string? browserError = null;
     try { hasBrowser = !string.IsNullOrWhiteSpace(Browser.ExecutablePath); }
@@ -62,7 +64,12 @@
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.9-3.9" /></svg>
                 </button>
             </form>
-            <div class="window-controls" aria-label="Window controls">
+            <div class="window-controls" aria-label="Power and window controls">
+                <form method="post" asp-page="/Power" asp-page-handler="Shutdown" class="power-shortcut" data-confirm="Shut down @System.Environment.MachineName in 15 seconds? Save your work first. You can cancel during the countdown; apps will not be forced closed.">
+                    <button type="submit" data-power-start disabled="@(powerStatus.Pending || powerStatus.Dispatching)" aria-label="Shut down PC" title="Shut down PC — 15-second cancellable countdown">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 2v10M6.3 5.3a9 9 0 1 0 11.4 0" /></svg>
+                    </button>
+                </form>
                 <button type="button" data-window-fullscreen aria-label="Enter fullscreen (F11)" title="Enter fullscreen (F11)" aria-pressed="false">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /></svg>
                 </button>
@@ -75,10 +82,10 @@
         {
             <div class="notice toast" role="status" data-toast>@notice</div>
         }
-        <section class="notice" data-power-banner hidden>
-            <p data-power-banner-text role="status"></p>
+        <section class="notice power-countdown" data-power-banner hidden="@(!powerStatus.Pending)" aria-label="PC shutdown countdown">
+            <p data-power-banner-text role="status">Shutdown in approximately @powerStatus.RemainingSeconds seconds. Save your work. Apps will not be forced closed.</p>
             <div class="actions">
-                <form method="post" asp-page="/Power" asp-page-handler="Cancel"><button type="submit" class="button secondary">Cancel shutdown</button></form>
+                <form method="post" asp-page="/Power" asp-page-handler="Cancel"><button type="submit" class="button primary" data-power-cancel disabled="@(!powerStatus.Pending)">Cancel shutdown</button></form>
                 <a class="button secondary" asp-page="/Power">PC power</a>
             </div>
         </section>
@@ -87,5 +94,14 @@
         <footer class="page-footer">Less searching. More playing.<span>GAME LAUNCHER / LOCAL LIBRARY</span></footer>
     </main>
 </div>
+<dialog class="confirmation-dialog" data-confirm-dialog aria-labelledby="confirmation-title" aria-describedby="confirmation-message">
+    <p class="eyebrow">LAUNCHPAD</p>
+    <h2 id="confirmation-title">Confirm action</h2>
+    <p id="confirmation-message" data-confirm-message></p>
+    <div class="actions">
+        <button type="button" class="button secondary" data-confirm-dismiss autofocus>Cancel</button>
+        <button type="button" class="button danger" data-confirm-accept>Confirm</button>
+    </div>
+</dialog>
 </body>
 </html>

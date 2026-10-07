@@ -61,6 +61,7 @@ private fun CompanionApp(model: CompanionModel) {
     val sessions by model.sessions.collectAsStateWithLifecycle()
     val storageError by model.storageError.collectAsStateWithLifecycle()
     var showPair by rememberSaveable { mutableStateOf(false) }
+    var showTips by rememberSaveable { mutableStateOf(false) }
     var removing by remember { mutableStateOf<PcSession?>(null) }
     var resetting by remember { mutableStateOf(false) }
     val pager = rememberPagerState(pageCount = { sessions.size })
@@ -70,8 +71,11 @@ private fun CompanionApp(model: CompanionModel) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Image(painterResource(R.drawable.brand_mark), contentDescription = null, modifier = Modifier.height(28.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("Launchpad", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                TextButton(onClick = { model.pairingError.value = null; showPair = true }, enabled = storageError == null) { Text("Add PC") }
+                Text("Launchpad Companion", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                TextButton(onClick = { showTips = true }) { Text("Tips") }
+                OutlinedIconButton(onClick = { model.pairingError.value = null; showPair = true }, enabled = storageError == null) {
+                    Icon(painterResource(R.drawable.ic_add), contentDescription = "Add PC")
+                }
             }
             if (storageError != null) {
                 Column(Modifier.padding(16.dp)) {
@@ -85,7 +89,7 @@ private fun CompanionApp(model: CompanionModel) {
                     Spacer(Modifier.height(24.dp))
                     Text("Your PCs. Your games.", style = MaterialTheme.typography.headlineMedium)
                     Spacer(Modifier.height(12.dp))
-                    Text("Open Companion on your Windows launcher, enable the LAN server, and request a pairing code. Connect this phone to the same trusted network.")
+                    Text("Pair a PC to get started. Need help? Open Tips.")
                     Spacer(Modifier.height(20.dp))
                     Button(onClick = { showPair = true }, enabled = storageError == null) { Text("Pair a PC") }
                 }
@@ -105,6 +109,7 @@ private fun CompanionApp(model: CompanionModel) {
             }
         }
     }
+    if (showTips) TipsDialog(dismiss = { showTips = false })
     if (showPair) PairDialog(model, dismiss = { showPair = false })
     removing?.let { session ->
         AlertDialog(onDismissRequest = { removing = null }, title = { Text("Remove ${session.saved.device.name}?") },
@@ -213,24 +218,37 @@ private fun PcPage(session: PcSession, reconnect: () -> Unit, remove: () -> Unit
     val ui by session.state.collectAsStateWithLifecycle()
     val sorted = remember(ui.games) { ui.games.sortedWith(compareBy<Game> { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }) }
     val running = remember(sorted) { sorted.filter { it.status == "Running" || it.status == "Stopping" } }
+    var actionsExpanded by remember(session) { mutableStateOf(false) }
     var trayHeightPx by remember(session) { mutableStateOf(0) }
     val density = LocalDensity.current
     val traySpace = if (running.isEmpty()) 0.dp else with(density) { trayHeightPx.toDp() }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text(ui.device.name, style = MaterialTheme.typography.headlineSmall)
-            Text(ui.endpoint, style = MaterialTheme.typography.bodySmall)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(ui.connection, color = if (ui.online) LauncherColors.SuccessText else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
-                TextButton(onClick = reconnect) { Text("Reconnect") }
-                TextButton(onClick = remove) { Text("Remove") }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(ui.device.name, style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    if (ui.online) Icon(painterResource(R.drawable.ic_connected), contentDescription = "Connected",
+                        tint = LauncherColors.SuccessText, modifier = Modifier.size(22.dp))
+                }
+                Box {
+                    OutlinedIconButton(onClick = { actionsExpanded = true }) {
+                        Icon(painterResource(R.drawable.ic_more), contentDescription = "PC actions")
+                    }
+                    DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
+                        DropdownMenuItem(text = { Text("Reconnect") }, onClick = { actionsExpanded = false; reconnect() })
+                        DropdownMenuItem(text = { Text("Remove PC", color = MaterialTheme.colorScheme.error) },
+                            onClick = { actionsExpanded = false; remove() })
+                    }
+                }
             }
+            if (!ui.online) Text(ui.connection, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelLarge)
             PcPowerControls(session, ui)
             if (!ui.online && ui.games.isNotEmpty()) Text("Last known library • controls disabled", style = MaterialTheme.typography.bodySmall)
             ui.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp)) }
-            if (ui.games.any { !it.canTrackStatus }) Text("For shortcut/Steam games, set the actual game’s tracking executable in Windows Edit to enable Playing and Stop.",
-                style = MaterialTheme.typography.bodySmall, color = LauncherColors.Muted)
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (sorted.isEmpty()) {
@@ -266,17 +284,19 @@ private fun PcPowerControls(session: PcSession, ui: PcUi) {
         if (power.pending) {
             Text(if (ui.online) "Shutdown in ~${power.remainingSeconds}s" else "Shutdown may still be pending",
                 modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
-            TextButton(enabled = ui.online && !ui.powerBusy, onClick = { session.shutdownPc(cancel = true) }) {
+            OutlinedButton(enabled = ui.online && !ui.powerBusy, onClick = { session.shutdownPc(cancel = true) }) {
                 Text(if (ui.powerBusy) "Sending…" else "Cancel shutdown")
             }
         } else {
-            TextButton(enabled = canShutdown, onClick = { confirmShutdown = true }) {
-                Text(if (ui.powerBusy) "Sending…" else "Shut down PC…")
+            OutlinedButton(enabled = canShutdown, onClick = { confirmShutdown = true }) {
+                Icon(painterResource(R.drawable.ic_power), contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (ui.powerBusy) "Sending…" else "Shut down PC")
             }
         }
     }
     if (ui.online && !power.remoteShutdownAllowed && !power.pending)
-        Text("Enable ‘Allow remote PC shutdown’ in Windows Settings → PC power.", style = MaterialTheme.typography.bodySmall)
+        Text("Setup required — see Tips → PC shutdown.", style = MaterialTheme.typography.bodySmall)
     if (power.revision > 0) Text(if (ui.online) power.message else
         "Power state is unconfirmed while offline. Check the PC; a lost connection does not prove shutdown or cancellation.",
         style = MaterialTheme.typography.bodySmall)

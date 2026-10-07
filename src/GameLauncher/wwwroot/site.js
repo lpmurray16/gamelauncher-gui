@@ -88,12 +88,47 @@ window.chrome?.webview?.addEventListener('message', (event) => {
 document.querySelectorAll("[data-toast]").forEach((toast) => {
   window.setTimeout(() => toast.remove(), 3000);
 });
-// Destructive forms confirm here; the CSP blocks inline onsubmit handlers.
-document.querySelectorAll("form[data-confirm]").forEach((form) => {
-  form.addEventListener("submit", (event) => {
-    if (!window.confirm(form.dataset.confirm)) event.preventDefault();
+// Shared themed confirmation. Preserve the original submitter and antiforgery POST.
+(() => {
+  const dialog = document.querySelector('[data-confirm-dialog]');
+  if (!dialog) return;
+  let pending = null;
+  let approved = null;
+  const dismiss = () => {
+    const target = pending?.focus;
+    pending = null;
+    dialog.close();
+    if (target?.isConnected) target.focus({ preventScroll: true });
+  };
+  dialog.querySelector('[data-confirm-dismiss]').addEventListener('click', dismiss);
+  dialog.addEventListener('cancel', (event) => { event.preventDefault(); dismiss(); });
+  dialog.querySelector('[data-confirm-accept]').addEventListener('click', () => {
+    const request = pending;
+    dismiss();
+    if (!request || !request.form.isConnected || request.submitter?.disabled) return;
+    approved = request.form;
+    try {
+      if (request.submitter) request.form.requestSubmit(request.submitter);
+      else request.form.requestSubmit();
+    } finally { approved = null; }
   });
-});
+  document.querySelectorAll('form[data-confirm]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      if (approved === form) return;
+      event.preventDefault();
+      // Do not let busy handlers disable a form before the user confirms.
+      event.stopImmediatePropagation();
+      if (dialog.open) return;
+      pending = { form, submitter: event.submitter, focus: document.activeElement };
+      const shutdown = !!form.querySelector('[data-power-start]');
+      dialog.querySelector('#confirmation-title').textContent = shutdown ? 'Shut down PC?' : 'Confirm action';
+      dialog.querySelector('[data-confirm-message]').textContent = form.dataset.confirm;
+      dialog.querySelector('[data-confirm-accept]').textContent = shutdown ? 'Start 15-second countdown' : 'Confirm';
+      dialog.showModal();
+      dialog.querySelector('[data-confirm-dismiss]').focus({ preventScroll: true });
+    });
+  });
+})();
 // Read-only power status; all desktop mutations remain antiforgery-protected POST forms.
 (() => {
   const banner = document.querySelector('[data-power-banner]');
@@ -267,19 +302,20 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
     });
     document.querySelectorAll('.submenu-trigger[aria-expanded="true"]').forEach((trigger) => setSubmenu(trigger, false));
   };
-  const openMenu = () => {
-    const menu = document.activeElement.closest('.entry-card')?.querySelector('.overlay-menu');
+  const openMenu = (card = document.activeElement.closest('.entry-card'), touch = false) => {
+    const menu = card?.querySelector('.overlay-menu');
     if (!menu) return;
     closeMenus();
     menu.classList.add('is-open');
     menu.querySelector('.menu-trigger').setAttribute('aria-expanded', 'true');
-    focus(menu.querySelector('.menu-item'));
+    if (touch) menu.querySelector('.menu-item')?.focus({ preventScroll: true });
+    else focus(menu.querySelector('.menu-item'));
   };
   document.querySelectorAll('.menu-trigger').forEach((button) => {
     button.addEventListener('click', () => {
       const wasOpen = button.closest('.overlay-menu').classList.contains('is-open');
       closeMenus();
-      if (!wasOpen) openMenu();
+      if (!wasOpen) openMenu(button.closest('.entry-card'));
     });
   });
   document.addEventListener('focusin', (event) => {
@@ -290,6 +326,92 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
     document.body.classList.remove('directional-navigation');
     if (!event.target.closest('.overlay-menu')) closeMenus();
   });
+  // Touch-only gestures; mouse, keyboard and gamepad continue through their existing paths.
+  (() => {
+    const surface = document.querySelector('[data-library-touch]');
+    if (!surface || !window.PointerEvent) return;
+    surface.classList.add('touch-library');
+    const touches = new Set();
+    const interactive = 'a, button, input, select, textarea, summary, [contenteditable], .overlay-menu';
+    let gesture = null;
+    let holdTimer = null;
+    let suppressed = null;
+    const clearHold = () => { window.clearTimeout(holdTimer); holdTimer = null; };
+    const cancel = () => { clearHold(); gesture = null; surface.classList.remove('touch-contact'); };
+    const blocked = () => keyboardActive || !!document.querySelector('dialog[open], .overlay-menu.is-open');
+    const suppress = (g) => { suppressed = { id: g.id, until: touches.has(g.id) ? Infinity : performance.now() + 1200 }; };
+    document.addEventListener('pointerdown', (event) => {
+      if (event.pointerType !== 'touch') return;
+      touches.add(event.pointerId);
+      if (touches.size !== 1) { cancel(); return; }
+      // A fresh touch is a new intentional tap, not the previous gesture's release click.
+      suppressed = null;
+      if (!event.isPrimary || blocked() || !surface.contains(event.target) || event.target.closest(interactive)) return;
+      surface.classList.add('touch-contact');
+      const g = gesture = { id: event.pointerId, x: event.clientX, y: event.clientY,
+        card: event.target.closest('.entry-card'), moved: false, held: false, horizontal: false };
+      if (g.card) holdTimer = window.setTimeout(() => {
+        if (gesture !== g || touches.size !== 1 || blocked() || g.moved) return;
+        g.held = true;
+        suppress(g);
+        openMenu(g.card, true);
+      }, 550);
+    }, true);
+    document.addEventListener('pointermove', (event) => {
+      const g = gesture;
+      if (!g || event.pointerId !== g.id) return;
+      const dx = event.clientX - g.x;
+      const dy = event.clientY - g.y;
+      if (Math.hypot(dx, dy) > 12) { g.moved = true; clearHold(); }
+      if (g.held) return;
+      if (!g.horizontal && Math.abs(dy) > 12 && Math.abs(dy) >= Math.abs(dx)) { cancel(); return; }
+      if (Math.abs(dx) > 20 && Math.abs(dx) > Math.abs(dy) * 1.5) g.horizontal = true;
+      if (g.horizontal) {
+        suppress(g);
+        if (event.cancelable) event.preventDefault();
+      }
+    }, { passive: false });
+    document.addEventListener('pointerup', (event) => {
+      touches.delete(event.pointerId);
+      if (suppressed?.id === event.pointerId) suppressed.until = performance.now() + 1200;
+      const g = gesture;
+      if (!g || event.pointerId !== g.id) return;
+      cancel();
+      if (g.held || g.moved) suppress(g);
+      if (g.held) { if (event.cancelable) event.preventDefault(); return; }
+      if (blocked()) return;
+      const dx = event.clientX - g.x;
+      const dy = event.clientY - g.y;
+      if (!g.horizontal || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      const tabs = Array.from(document.querySelectorAll('.library-toolbar .tab:not(.tab-add)'));
+      const index = tabs.findIndex((tab) => tab.classList.contains('selected'));
+      const next = index + (dx < 0 ? 1 : -1);
+      if (index < 0 || next < 0 || next >= tabs.length) return;
+      // Reuse real filter links and their viewport-preservation handler; never reconstruct URLs.
+      tabs[next].click();
+    });
+    document.addEventListener('pointercancel', (event) => {
+      touches.delete(event.pointerId);
+      if (suppressed?.id === event.pointerId) suppressed.until = performance.now() + 1200;
+      if (gesture?.id === event.pointerId) cancel();
+    });
+    document.addEventListener('click', (event) => {
+      if (!suppressed || performance.now() > suppressed.until || event.detail === 0) return;
+      const fromTouch = event.pointerType === 'touch' || event.sourceCapabilities?.firesTouchEvents;
+      if (!fromTouch || (event.pointerType === 'touch' && event.pointerId !== suppressed.id)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      suppressed = null;
+    }, true);
+    surface.addEventListener('contextmenu', (event) => {
+      // Suppress the native touch callout only; right-click and keyboard menus are unaffected.
+      if (event.pointerType !== 'mouse' && (gesture || (suppressed && performance.now() < suppressed.until))) event.preventDefault();
+    });
+    window.addEventListener('scroll', cancel, { passive: true });
+    window.addEventListener('blur', () => { cancel(); touches.clear(); });
+    document.addEventListener('visibilitychange', () => { cancel(); touches.clear(); });
+    window.addEventListener('pagehide', () => { cancel(); touches.clear(); });
+  })();
   const candidates = () => Array.from(document.querySelectorAll(selector)).filter((el) => {
     if (!visible(el) || el.classList.contains('skip-link')) return false;
     const card = el.closest('.entry-card');
@@ -318,6 +440,13 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
   };
   const move = (direction) => {
     const active = document.activeElement;
+    const dialog = document.querySelector('[data-confirm-dialog][open]');
+    if (dialog) {
+      const buttons = Array.from(dialog.querySelectorAll('button')).filter(visible);
+      const index = buttons.indexOf(active);
+      focus(buttons[(index + (direction === 'left' || direction === 'up' ? buttons.length - 1 : 1)) % buttons.length]);
+      return;
+    }
     const menu = active.closest('.overlay-menu.is-open');
     if (menu) {
       // Collapsed submenu items are [hidden], so visible() keeps up/down to the expanded list.
@@ -369,6 +498,8 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
     active.click();
   };
   const back = () => {
+    const dialog = document.querySelector('[data-confirm-dialog][open]');
+    if (dialog) { dialog.querySelector('[data-confirm-dismiss]').click(); return; }
     const menu = document.querySelector('.overlay-menu.is-open');
     const trigger = document.activeElement.closest('.menu-submenu')?.querySelector('.submenu-trigger[aria-expanded="true"]');
     if (menu && trigger) {
@@ -385,6 +516,14 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
   };
   document.addEventListener('keydown', (event) => {
     if (event.defaultPrevented || event.isComposing) return;
+    if (document.querySelector('[data-confirm-dialog][open]')) {
+      const direction = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }[event.key];
+      if (direction) { event.preventDefault(); move(direction); }
+      else if (event.key === 'Escape') { event.preventDefault(); if (!event.repeat) back(); }
+      else if (event.key === 'Enter' && event.repeat) event.preventDefault();
+      else if (['F1', 'F2', 'F10', 'ContextMenu'].includes(event.key)) event.preventDefault();
+      return;
+    }
     if (event.key === 'F11' && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
       event.preventDefault();
       if (!event.repeat) window.chrome?.webview?.postMessage('window.fullscreen');
@@ -442,6 +581,17 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
       armed = pressed.size === 0 && !direction;
       previous = pressed;
       heldDirection = null;
+      return;
+    }
+    // Modal input cannot navigate or activate the underlying library.
+    if (document.querySelector('[data-confirm-dialog][open]')) {
+      if (pressed.has(1) && !previous.has(1)) back();
+      else if (direction && (direction !== heldDirection || now >= nextMove)) {
+        move(direction);
+        nextMove = now + (direction === heldDirection ? 150 : 350);
+      } else if (pressed.has(0) && !previous.has(0)) activate();
+      heldDirection = direction;
+      previous = pressed;
       return;
     }
     // Standard-mapped triggers: previous/next dashboard category, once per squeeze.

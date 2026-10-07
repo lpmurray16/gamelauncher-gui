@@ -2,9 +2,11 @@
 
 A Windows-first, local-file game launcher built with **C# / .NET 10, Razor Pages, WinForms + WebView2, Entity Framework Core, and SQLite**.
 
-**Release: 1.5.1.** Windows x64 Release publish and Inno Setup installer compilation succeeded; executable versions and installer SHA-256 were verified. The installer is unsigned. Installation, upgrade, uninstall, and missing-WebView2 behavior for this release still require a manual walkthrough. The owner confirmed the smooth one-third controller jumps work; other new runtime behavior is not implied by a successful build. No test suite is included or planned. See [1.5.1 release notes](docs/releases/1.5.1.md).
+**Windows release: 1.6.0 · Android: 1.2 (release build complete; owner signing pending).** Windows Release publish and installer compilation succeeded; app/installer versions and SHA-256 were verified. The Windows installer is unsigned. Launchpad Companion 1.2 compiled successfully with versionCode 2, but its APK must be signed with the existing release key before installation/distribution. No apps were installed or launched. See [release notes](docs/releases/1.6.0.md).
 
 ## Features
+
+- **Touch controls:** swipe left/right across the library grid or empty-library area to move through All entries, Favorites and collections in displayed order, without wrapping. Sort/search and viewport restoration use the existing filter links. Hold a card’s artwork/title for about half a second to open its existing actions menu. Buttons/links, menus and dialogs are excluded; vertical scrolling and pinch zoom remain native. Mouse, keyboard and controller inputs retain their existing paths. Included in the 1.6.0 build; no Ally device verification performed; check scrolling versus swiping, release-click suppression, long holds, multi-touch and alternating touch/controller/mouse input after rebuilding.
 
 - Games, Emulators, and Tools sections with search and favorites.
 - Add, edit, and remove library entries without deleting their files.
@@ -91,21 +93,21 @@ In **Edit entry → Bundled launch group**, select up to eight existing library 
 The optional native Android app supports QR/manual pairing, multiple PCs, game covers, launch commands and live process status. See [setup/security](docs/companion.md) and the [Android README](src/GameLauncher.Companion/README.md). It is built separately in Android Studio and is **not included in the Windows installer**.
 
 - Enable companion access on Windows and pair only over a trusted private LAN. HTTP is unencrypted; never expose the port to the internet. Protected commands require the paired bearer credential.
-- **Companion Now playing tray (new source increment):** running games appear in a floating bottom tray with their hero/background artwork and Stop controls, while the library stays alphabetical. Multiple active games have Previous/Next selectors; missing backgrounds use a placeholder. Rebuild both apps for the new background-image endpoint. This UI has not been rendered/tested by the assistant and is not in the existing installer/APK.
+- **Companion Now playing tray:** running games appear in a floating bottom tray with their hero/background artwork and Stop controls, while the library stays alphabetical. Multiple active games have Previous/Next selectors; missing backgrounds use a placeholder. Rebuild both apps for the new background-image endpoint. Included in Windows 1.6.0 and the Android 1.2 release build; Android signing and rendered/device checks remain pending.
 - Running tracked games offer **Stop game → Close normally**. A game may show a save/exit dialog on the PC. **Force stop instead…** requires a separate unsaved-progress confirmation.
 - Stopping targets one exact executable match in the launcher's Windows session—not a process tree or bundled apps. Inaccessible/ambiguous matches are refused; Steam and Launchpad themselves are explicitly blocked. Administrator-run/protected games may require closing on the PC. Playing clears based on observed exit, not request acceptance.
 - For shortcuts, Steam URLs or bootstrap launchers, set **Edit entry → Status tracking executable** to the actual game's `.exe`. Leave the shortcut as the launch target. A running-process picker and automatic executable discovery are not implemented.
 - Both sides need the updated code for Stop controls; this Windows build does not rebuild or replace an existing Android APK. No remote keyboard/UAC approval is implemented.
 
-## PC shutdown (new source increment; not in the existing 1.5.1 installer)
+## PC shutdown
 
-Open **Settings → PC power → Shutdown & power preferences** to request shutdown after a **15-second cancellable countdown**. Confirmation names the PC. A countdown banner appears across Windows pages with a Cancel shutdown button.
+Use the header power icon or open **Launchpad → Settings → PC power** to request shutdown after a **15-second cancellable countdown**. Confirmation names the PC. A countdown banner appears across Windows pages with a Cancel shutdown button.
 
-For Android, first enable **Allow remote PC shutdown** on that Windows page (off by default), then use **Shut down PC…** on the paired PC's page. Any authenticated paired phone can cancel a pending countdown, including a locally started one. Both apps need rebuilding; no installer/APK was rebuilt for this increment.
+For Android, first enable **Allow shutdown from Launchpad Companion** on that Windows page (off by default), then use **Shut down PC…** on the paired PC's page. Any authenticated paired phone can cancel a pending countdown, including a locally started one. Included in the Windows 1.6.0 installer and Android 1.2 release build (owner signing pending).
 
 The countdown runs in Launchpad, which must remain open. Disconnecting/backgrounding the phone does not cancel it. Disabling remote permission, disabling companion access or revoking pairing cancels a pending remote countdown. Closing Launchpad cancels undispatched countdowns. After dispatch, cancellation through Launchpad is no longer available. Shutdown requests are not retried automatically; a lost connection does not prove power-off or cancellation.
 
-At expiry, Launchpad invokes the fixed Windows shutdown action with no force flag. Windows policy or unsaved apps may block shutdown. Save your work first. Restart, sleep and Wake-on-LAN are not part of this increment. Source-reviewed only; no shutdown command, build or runtime walkthrough was executed by the assistant.
+At expiry, Launchpad invokes the fixed Windows shutdown action with no force flag. Windows policy or unsaved apps may block shutdown. Save your work first. Restart, sleep and Wake-on-LAN are not part of this increment. The owner reported Windows shutdown works. Release builds succeeded; the assistant did not execute shutdown or verify Android shutdown on a device.
 
 ## Artwork storage
 
@@ -158,9 +160,9 @@ src/GameLauncher/
 
 The solution contains the Windows app and `src/GameLauncher.Contracts` (wire DTOs only). `src/GameLauncher.Companion` is a separate native Kotlin/Jetpack Compose Android Gradle project in the same repository, opened in Android Studio—not a MAUI project or a .NET solution build dependency. Windows builds and the installer do not need Android tooling. Kotlin models mirror the documented JSON contracts rather than referencing the .NET assembly.
 
-## v1.5.1 installer
+## v1.6.0 installer
 
-Output: `artifacts/installer/GameLauncher-Setup-1.5.1-win-x64.exe`, with a companion `.sha256` checksum file. Only the setup executable is required for distribution.
+Output: `artifacts/installer/GameLauncher-Setup-1.6.0-win-x64.exe`, with a companion `.sha256` checksum file. Only the setup executable is required for distribution.
 
 - Windows x64 package; Setup requires Windows 10 22H2 or newer.
 - Per-user installation to `%LOCALAPPDATA%/Programs/GameLauncher`, without requesting administrator rights.

@@ -1,8 +1,16 @@
-# Launchpad — Android companion
+# Launchpad Companion — Android
 
 Native Kotlin / Jetpack Compose companion with QR and manual pairing. Open **this directory** in Android Studio; it is a separate Gradle project, not a .NET solution project. There is no fake library, bundled credential, discovery service, or test scaffold.
 
-## Toolchain (owner-run only)
+## Release 1.2
+
+Version name **1.2**, version code **2** (previous release: 1.0/code 1). `assembleRelease --no-daemon` succeeded with JBR 21.0.11 and Gradle 8.13, including Kotlin compilation, Android resource packaging and release vital lint. The unsigned artifact is `../../artifacts/android/Launchpad-Companion-1.2-unsigned.apk`; it is **not installable until signed**. The owner will use Android Studio → Build → Generate Signed App Bundle / APK → APK, with the same release key as v1. No signing credentials were read or stored. No installation or device walkthrough was performed.
+
+Includes the background-art Now playing tray, compact PC header/actions, Tips sections, explicit Launchpad/Launchpad Companion naming, and opt-in shutdown/countdown controls. See [release notes](../../docs/releases/1.6.0.md). Earlier source-only implementation notes below describe their original verification state; this release build supersedes their no-build claims, not their outstanding device checks.
+
+The existing reused Gradle daemon failed to start AAPT2 with Windows error 740; a fresh single-use daemon (`--no-daemon`) succeeded with the standard Maven AAPT2. No permanent AAPT2 override or system changes were needed.
+
+## Toolchain
 
 - Android SDK Platform **36**, minimum device Android **8.0 / API 26**.
 - Android Gradle Plugin **8.13.2**, Gradle **8.13**, Kotlin + Compose compiler plugin **2.3.10**; Java/Kotlin bytecode target **17**.
@@ -40,7 +48,7 @@ The tray shares the existing normal/force-stop confirmation with grid cards. Its
 
 ### PC shutdown (source-only increment)
 
-Rebuild Windows and Android. On Windows **Settings → PC power**, enable **Allow remote PC shutdown** (off by default). The paired PC page then offers **Shut down PC…**, with confirmation naming the PC and a **15-second** countdown plus **Cancel shutdown**. The countdown runs on the PC: phone disconnection/backgrounding does not cancel it. Closing Windows Launchpad before dispatch cancels it; disabling remote permission/companion access or revoking pairing cancels pending remote countdowns. Once the request reaches Windows, this app cannot cancel it or confirm power-off. Apps are not forced closed; save work first and check the PC if Windows blocks shutdown.
+Rebuild Windows and Android. On your PC, open **Launchpad → Settings → PC power**, enable **Allow shutdown from Launchpad Companion** (off by default), and select **Save power preferences**. These are settings inside Launchpad, not Windows OS Settings. The paired PC page then offers **Shut down PC…**, with confirmation naming the PC and a **15-second** countdown plus **Cancel shutdown**. The countdown runs on the PC: phone disconnection/backgrounding does not cancel it. Closing Windows Launchpad before dispatch cancels it; disabling remote permission/companion access or revoking pairing cancels pending remote countdowns. Once the request reaches Windows, this app cannot cancel it or confirm power-off. Apps are not forced closed; save work first and check the PC if Windows blocks shutdown.
 
 Power status polls while connected; power network calls time out after four seconds, POSTs are never retried automatically, and older Windows versions returning 404 hide power controls without breaking game access. Offline status is explicitly unconfirmed. A paired phone can cancel a locally started countdown too. No restart/Wake-on-LAN is included. No build, APK deployment or shutdown was executed by the assistant; start owner checks by scheduling then cancelling well before expiry.
 
