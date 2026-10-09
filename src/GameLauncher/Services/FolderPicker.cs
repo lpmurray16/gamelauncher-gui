@@ -22,6 +22,39 @@ public sealed class FolderPicker
         });
     }
 
+    public Task<string?> PickEntryPathAsync(string kind)
+    {
+        if (kind is not ("launch" or "working" or "tracking"))
+            throw new ArgumentException("Choose a valid entry path field.");
+        var owner = OwnerOrThrow();
+        return RunDialog(owner, () =>
+        {
+            if (kind == "working")
+            {
+                using var folder = new FolderBrowserDialog
+                {
+                    Description = "Choose the working directory",
+                    UseDescriptionForTitle = true,
+                    ShowNewFolderButton = false
+                };
+                return folder.ShowDialog(owner) == DialogResult.OK ? folder.SelectedPath : null;
+            }
+            using var file = new OpenFileDialog
+            {
+                Title = kind == "launch" ? "Choose a launch file" : "Choose the status tracking executable",
+                Filter = kind == "launch"
+                    ? "Launch files (*.exe;*.lnk;*.url)|*.exe;*.lnk;*.url"
+                    : "Executable (*.exe)|*.exe",
+                CheckFileExists = true,
+                Multiselect = false,
+                // Selecting a .lnk must retain the shortcut's own launch arguments.
+                DereferenceLinks = false,
+                RestoreDirectory = true
+            };
+            return file.ShowDialog(owner) == DialogResult.OK ? file.FileName : null;
+        });
+    }
+
     public Task<string?> PickBrowserAsync()
     {
         var owner = OwnerOrThrow();

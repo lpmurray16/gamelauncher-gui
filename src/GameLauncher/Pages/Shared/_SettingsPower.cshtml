@@ -1,0 +1,27 @@
+@model SettingsModel
+@{ var status = Model.PowerStatus; }
+<section class="panel" data-power-controls>
+    <h2>Shut down @Model.ComputerName</h2>
+    <details class="settings-help"><summary>How shutdown works</summary><div class="settings-help-copy"><p>Starts a 15-second countdown in Launchpad. Save your work first. Apps are not forced closed and may block Windows shutdown.</p></div></details>
+    <p data-power-message role="status">@status.Message</p>
+    <p data-power-countdown>@(status.Pending ? $"Shutdown in approximately {status.RemainingSeconds} seconds." : "")</p>
+    <div class="actions">
+        <form method="post" asp-page="/Power" asp-page-handler="Shutdown" data-confirm="Shut down @Model.ComputerName in 15 seconds? Save your work first. You can cancel during the countdown; apps will not be forced closed.">
+            <button type="submit" class="button danger" data-power-start disabled="@(status.Pending || status.Dispatching)">Shut down PC…</button>
+        </form>
+        <form method="post" asp-page="/Power" asp-page-handler="Cancel">
+            <button type="submit" class="button secondary" data-power-cancel disabled="@(!status.Pending)">Cancel shutdown</button>
+        </form>
+    </div>
+    <details class="settings-help"><summary>Cancelling shutdown</summary><div class="settings-help-copy"><p>Keep Launchpad running during the countdown. Closing it cancels a countdown that has not yet been sent to Windows. After dispatch, Launchpad cannot cancel Windows shutdown or confirm the PC powered off.</p></div></details>
+</section>
+<section class="panel">
+    <h2>Launchpad Companion permission</h2>
+    <form method="post" asp-page="/Power" asp-page-handler="Permission" data-confirm="Save remote shutdown permission? Enabling it allows paired phones to shut down this PC. Only use a trusted private LAN: companion HTTP is unencrypted.">
+        <label class="check-label"><input asp-for="AllowRemoteShutdown" /> Allow shutdown from Launchpad Companion</label>
+        <details class="settings-help"><summary>About remote shutdown permission</summary><div class="settings-help-copy"><p>Off by default. Allows Launchpad Companion on any phone paired to this PC to schedule shutdown. Companion HTTP is unencrypted: intercepted credentials can be used to control this PC. Enable only on a trusted private LAN. Disabling this permission, disabling companion access, or revoking pairings cancels a pending remote countdown.</p></div></details>
+        <button type="submit" class="button primary">Save power preferences</button>
+    </form>
+    <details class="settings-help"><summary>Cancellation from your phone</summary><div class="settings-help-copy"><p>An authenticated paired phone can cancel a pending countdown, including one started locally. No shutdown commands are retried automatically.</p></div></details>
+
+</section>

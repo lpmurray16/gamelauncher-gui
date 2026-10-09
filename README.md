@@ -2,7 +2,7 @@
 
 A Windows-first, local-file game launcher built with **C# / .NET 10, Razor Pages, WinForms + WebView2, Entity Framework Core, and SQLite**.
 
-**Windows release: 1.6.0 · Android: 1.2 (release build complete; owner signing pending).** Windows Release publish and installer compilation succeeded; app/installer versions and SHA-256 were verified. The Windows installer is unsigned. Launchpad Companion 1.2 compiled successfully with versionCode 2, but its APK must be signed with the existing release key before installation/distribution. No apps were installed or launched. See [release notes](docs/releases/1.6.0.md).
+**Windows release: 1.7.0 · Android: 1.2 (release build complete; owner signing pending).** Windows Release publish and installer compilation succeeded; app/installer versions and SHA-256 were verified. The Windows installer is unsigned. Launchpad Companion 1.2 compiled successfully with versionCode 2, but its APK must be signed with the existing release key before installation/distribution. No apps were installed or launched. See [release notes](docs/releases/1.6.0.md).
 
 ## Features
 

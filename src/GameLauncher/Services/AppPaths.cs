@@ -13,6 +13,16 @@ public sealed class AppPaths
     public string LogPath => Path.Combine(DataDirectory, "startup.log");
     public AppPaths() => Directory.CreateDirectory(DataDirectory);
 
+    public void OpenFileExplorer()
+    {
+        // Fixed Windows executable, no caller-supplied path or arguments.
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"),
+            UseShellExecute = true
+        });
+    }
+
     public void OpenInExplorer(string location)
     {
         // Accept only known storage locations, never a caller-supplied path or command.

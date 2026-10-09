@@ -5,7 +5,7 @@
     ViewData["Section"] = Model.Category.ToString();
 }
 <a class="back-link" asp-page="/Index" asp-route-category="@Model.Category">← Back to @Model.Category</a>
-<header class="page-heading"><div><p class="eyebrow">BUILD YOUR COLLECTION</p><h1>Discover local entries<span class="heading-dot">.</span></h1><p class="lede">Choose a folder. Review what we find. Import only what you want.</p></div></header>
+<header class="page-heading"><div><h1>Discover local entries<span class="heading-dot">.</span></h1></div></header>
 <div asp-validation-summary="All" class="validation" role="alert"></div>
 <section class="panel"><div class="panel-heading"><span class="step-number">01</span><div><h2>Choose a folder</h2><p>Find .exe files, Windows .lnk shortcuts, and supported Steam .url shortcuts. Nothing is launched or imported automatically.</p></div></div>
 <form method="post" asp-page-handler="Scan" data-scan-form>

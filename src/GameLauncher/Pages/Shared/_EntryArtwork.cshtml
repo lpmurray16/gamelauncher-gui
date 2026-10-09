@@ -1,0 +1,142 @@
+@model EditModel
+@{
+    var cover = Model.Entry?.CoverImageFile;
+    var hero = Model.Entry?.HeroImageFile;
+}
+<div id="entry-artwork" tabindex="-1" aria-label="Entry artwork">
+<div asp-validation-summary="All" class="validation" role="alert"></div>
+@if (Model.ArtworkNotice is string notice)
+{
+    <p class="notice" role="status">@notice</p>
+}
+<p class="notice">Artwork changes are saved immediately. Entry details above are saved with Save changes.</p>
+<section class="panel">
+    <div class="panel-heading"><span class="step-number">02</span><div><h2>Current artwork</h2><p>Cover shows on library cards; the background banner shows behind the library heading.</p></div></div>
+    <div class="artwork-preview">
+        <div class="preview-tile" id="cover-tile">
+            <span class="preview-label">Cover</span>
+            @if (cover is not null) { <img id="cover-img" src="/artwork/image/@cover" alt="Cover for @Model.Entry?.Title" /> }
+            else { <div class="preview-empty">None yet</div> }
+            <div class="preview-actions">
+                <form method="post" asp-page="/Edit" asp-page-handler="Local"><input type="hidden" name="id" value="@Model.Id" /><input type="hidden" name="kind" value="Cover" /><button class="button secondary" type="submit">Choose local image</button></form>
+                @if (cover is not null) { <form method="post" asp-page="/Edit" asp-page-handler="Clear"><input type="hidden" name="id" value="@Model.Id" /><input type="hidden" name="kind" value="Cover" /><button class="button danger" type="submit">Remove</button></form> }
+            </div>
+        </div>
+        <div class="preview-tile wide" id="hero-tile">
+            <span class="preview-label">Background banner</span>
+            @if (hero is not null) { <img id="hero-img" src="/artwork/image/@hero" alt="Background for @Model.Entry?.Title" /> }
+            else { <div class="preview-empty">None yet</div> }
+            <div class="preview-actions">
+                <form method="post" asp-page="/Edit" asp-page-handler="Local"><input type="hidden" name="id" value="@Model.Id" /><input type="hidden" name="kind" value="Hero" /><button class="button secondary" type="submit">Choose local image</button></form>
+                @if (hero is not null) { <form method="post" asp-page="/Edit" asp-page-handler="Clear"><input type="hidden" name="id" value="@Model.Id" /><input type="hidden" name="kind" value="Hero" /><button class="button danger" type="submit">Remove</button></form> }
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-heading"><span class="step-number">03</span><div><h2>Find artwork online</h2>
+        <p>Requires a SteamGridDB API key in <a asp-page="/Settings" asp-route-tab="artwork">Settings</a>. Artwork is downloaded and stored locally.</p></div></div>
+
+    @if (!Model.HasSearched && !Model.HasSelectedGame)
+    {
+        <!-- Initial search form -->
+        <form method="post" asp-page="/Edit" asp-page-handler="Search" class="provider-search" data-busy-form data-busy-label="Searching…">
+            <input type="hidden" name="id" value="@Model.Id" />
+            <input name="providerSearch" aria-label="Search SteamGridDB" value="@(string.IsNullOrEmpty(Model.ProviderSearch) ? Model.Entry?.Title : Model.ProviderSearch)" placeholder="Search for the game…" maxlength="200" />
+            <button class="button primary" type="submit">Search</button>
+        </form>
+    }
+    else if (Model.Matches.Count > 0 && !Model.HasSelectedGame)
+    {
+        <!-- Game match selection -->
+        <div class="search-result-header">
+            <span class="search-query">Results for "<strong>@Model.ProviderSearch</strong>"</span>
+            <form method="post" asp-page="/Edit" asp-page-handler="SearchAgain" class="search-again-form">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <button class="button ghost" type="submit">Search again</button>
+            </form>
+        </div>
+        <div class="match-list">
+        @foreach (var match in Model.Matches)
+        {
+            <form method="post" asp-page="/Edit" asp-page-handler="Pick" class="match-row">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <input type="hidden" name="providerGameId" value="@match.Id" />
+                <input type="hidden" name="providerTitle" value="@match.Name" />
+                <span class="match-name">@match.Name @if (match.Verified) { <span class="verified">✓</span> } <small>@match.Kinds</small></span>
+                <span class="match-actions">
+                    <button class="button primary" type="submit">Select game</button>
+                </span>
+            </form>
+        }
+        </div>
+    }
+    else if (Model.HasSelectedGame)
+    {
+        <!-- Artwork options for selected game (both cover and hero) -->
+        <div class="search-result-header">
+            <span class="search-query">Artwork for "<strong>@Model.SelectedGameTitle</strong>"</span>
+            <form method="post" asp-page="/Edit" asp-page-handler="SearchAgain" class="search-again-form">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <button class="button ghost" type="submit">Search again</button>
+            </form>
+        </div>
+
+        @if (Model.CoverOptions.Count > 0)
+        {
+            <details class="artwork-section artwork-section-cover" open>
+                <summary><span><strong>Cover art</strong><small>Portrait images for your library cards</small></span><span class="artwork-count">@Model.CoverOptions.Count options</span></summary>
+                <div class="artwork-options">
+                @foreach (var option in Model.CoverOptions)
+                {
+                    <form method="post" asp-page="/Edit" asp-page-handler="Download" class="option-card" data-kind="Cover" data-busy-form data-busy-label="Applying cover…">
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <input type="hidden" name="kind" value="Cover" />
+                        <input type="hidden" name="providerGameId" value="@Model.SelectedGameId" />
+                        <input type="hidden" name="providerTitle" value="@Model.SelectedGameTitle" />
+                        <input type="hidden" name="imageUrl" value="@option.ImageUrl" />
+                        <img src="/artwork/proxy?url=@Uri.EscapeDataString(option.ThumbnailUrl)" alt="Cover artwork option" loading="lazy" />
+                        <button class="button primary" type="submit">Use this</button>
+                        @if (!string.IsNullOrEmpty(option.Author)) { <small>by @option.Author</small> }
+                    </form>
+                }
+                </div>
+            </details>
+        }
+
+        @if (Model.HeroOptions.Count > 0)
+        {
+            <details class="artwork-section artwork-section-hero" open>
+                <summary><span><strong>Background art</strong><small>Wide banners for your library heading</small></span><span class="artwork-count">@Model.HeroOptions.Count options</span></summary>
+                <div class="artwork-options">
+                @foreach (var option in Model.HeroOptions)
+                {
+                    <form method="post" asp-page="/Edit" asp-page-handler="Download" class="option-card" data-kind="Hero" data-busy-form data-busy-label="Applying background…">
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <input type="hidden" name="kind" value="Hero" />
+                        <input type="hidden" name="providerGameId" value="@Model.SelectedGameId" />
+                        <input type="hidden" name="providerTitle" value="@Model.SelectedGameTitle" />
+                        <input type="hidden" name="imageUrl" value="@option.ImageUrl" />
+                        <img src="/artwork/proxy?url=@Uri.EscapeDataString(option.ThumbnailUrl)" alt="Background artwork option" loading="lazy" />
+                        <button class="button primary" type="submit">Use this</button>
+                        @if (!string.IsNullOrEmpty(option.Author)) { <small>by @option.Author</small> }
+                    </form>
+                }
+                </div>
+            </details>
+        }
+
+        @if (Model.CoverOptions.Count == 0 && Model.HeroOptions.Count == 0)
+        {
+            <div class="no-results">No artwork available for this game.</div>
+        }
+    }
+    else if (Model.HasSearched && Model.Matches.Count == 0)
+    {
+        <div class="no-results">No games found for "<strong>@Model.ProviderSearch</strong>". <form method="post" asp-page="/Edit" asp-page-handler="SearchAgain" class="search-again-form"><input type="hidden" name="id" value="@Model.Id" /><button class="button ghost" type="submit">Search again</button></form></div>
+    }
+</section>
+
+
+</div>

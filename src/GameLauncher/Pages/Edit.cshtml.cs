@@ -8,10 +8,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace GameLauncher.Pages;
 
-public sealed class EditModel : UiPageModel
+public sealed partial class EditModel : UiPageModel
 {
     private readonly LibraryService _library;
-    public EditModel(LibraryService library) => _library = library;
     [BindProperty] public Guid? Id { get; set; }
     [BindProperty, Required, StringLength(200)] public string Title { get; set; } = "";
     [BindProperty, Required, Display(Name = "Executable path")] public string TargetPath { get; set; } = "";
@@ -26,7 +25,11 @@ public sealed class EditModel : UiPageModel
 
     private async Task<IActionResult> EditorPageAsync()
     {
-        try { CompanionChoices = await _library.GetCompanionChoicesAsync(Id); }
+        try
+        {
+            CompanionChoices = await _library.GetCompanionChoicesAsync(Id);
+            Entry = Id.HasValue ? await _library.GetAsync(Id.Value) : null;
+        }
         catch (Exception error) when (IsExpected(error)) { ShowError(error); }
         return Page();
     }
@@ -46,14 +49,30 @@ public sealed class EditModel : UiPageModel
         catch (Exception error) when (IsExpected(error)) { ShowError(error); }
         return await EditorPageAsync();
     }
+    public async Task<IActionResult> OnPostBrowsePathAsync([FromForm] string kind)
+    {
+        // This authenticated, antiforgery-protected request only picks a path.
+        // Entry validation and saving belong to the separate Save action.
+        ModelState.Clear();
+        try
+        {
+            var path = await _picker.PickEntryPathAsync(kind);
+            return new JsonResult(new { path });
+        }
+        catch (Exception error) when (IsExpected(error))
+        {
+            return new JsonResult(new { error = error.Message }) { StatusCode = 400 };
+        }
+    }
+
     public async Task<IActionResult> OnPostAsync()
     {
         if (!ModelState.IsValid) return await EditorPageAsync();
         try
         {
-            await _library.SaveAsync(new EntryInput(Id, Title, TargetPath, Arguments, WorkingDirectory, Category, IsFavorite, CompanionIds, TrackingExecutablePath));
-            TempData["Notice"] = Id.HasValue ? "Entry updated." : "Entry added to your library.";
-            return RedirectToPage("/Index", new { category = Category });
+            var savedId = await _library.SaveAsync(new EntryInput(Id, Title, TargetPath, Arguments, WorkingDirectory, Category, IsFavorite, CompanionIds, TrackingExecutablePath));
+            TempData["Notice"] = Id.HasValue ? "Entry updated." : "Entry added. You can now choose its artwork below.";
+            return RedirectToPage("/Edit", new { id = savedId });
         }
         catch (Exception error) when (IsExpected(error)) { ShowError(error); return await EditorPageAsync(); }
     }

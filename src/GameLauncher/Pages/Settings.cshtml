@@ -4,60 +4,93 @@
     ViewData["Title"] = "Settings";
     ViewData["Section"] = "Settings";
 }
-<header class="page-heading"><div><p class="eyebrow">UNDER THE HOOD</p><h1>Settings<span class="heading-dot">.</span></h1><p class="lede">A local library, without the extra noise.</p></div></header>
+<header class="page-heading"><div><h1>Settings<span class="heading-dot">.</span></h1></div></header>
+<nav class="settings-nav" aria-label="Settings sections" data-settings-nav>
+    @foreach (var item in new[] {
+        (Id: "startup", Label: "Startup & display"),
+        (Id: "power", Label: "PC power"),
+        (Id: "browser", Label: "Browser"),
+        (Id: "companion", Label: "Companion"),
+        (Id: "artwork", Label: "Artwork"),
+        (Id: "storage", Label: "Local storage"),
+        (Id: "about", Label: "About") })
+    {
+        <a class="settings-nav-link" asp-page="/Settings" asp-route-tab="@item.Id" data-settings-tab="@item.Id" aria-controls="@item.Id" aria-current="@(Model.ActiveTab == item.Id ? "page" : null)">@item.Label</a>
+    }
+</nav>
 <div asp-validation-summary="All" class="validation" role="alert"></div>
 
-<section class="panel">
-    <h2>Android companion</h2>
-    <p>Pair your phone to view and launch this computer's games over your trusted local network. LAN access is off by default.</p>
-    <a class="button secondary" asp-page="/Companion">Manage companion access</a>
-</section>
+<div id="companion" data-settings-panel="companion" aria-label="Android companion" hidden="@(Model.ActiveTab != "companion")">
+    <partial name="_SettingsCompanion" model="Model" />
+</div>
 
-<section class="panel">
+<div id="power" data-settings-panel="power" aria-label="PC power" hidden="@(Model.ActiveTab != "power")">
+    <section class="panel">
     <h2>PC power</h2>
-    <p>Shut down this PC with a cancellable 15-second countdown. Remote shutdown is separately opt-in.</p>
-    <a class="button secondary" asp-page="/Power">Shutdown &amp; power preferences</a>
-</section>
+    <details class="settings-help">
+        <summary>About PC power controls</summary>
+        <div class="settings-help-copy"><p>The header power menu offers Shut down, Sleep, and Restart. Shutdown uses a cancellable 15-second countdown. Remote shutdown is separately opt-in.</p></div>
+    </details>
+    <form method="post" asp-route-tab="power" asp-page-handler="PowerMenu" data-busy-form data-busy-label="Saving…">
+        <label class="check-label"><input asp-for="ShowFirmwareRestart" /> Show Restart to UEFI / BIOS in the power menu</label>
+        <details class="settings-help">
+            <summary>About the UEFI / BIOS option</summary>
+            <div class="settings-help-copy"><p>Power user option — off by default. Opens the firmware interface on supported PCs, not necessarily the boot-device picker. Requires administrator approval and restarts immediately after confirmation; save your work first.</p></div>
+        </details>
+        <button type="submit" class="button secondary">Save power menu preference</button>
+    </form>
+    </section>
+    <partial name="_SettingsPower" model="Model" />
+</div>
 
-<section class="panel" id="browser">
-    <div class="panel-heading"><span class="step-number" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="4" ry="9" /><path d="M3 12h18" /></svg></span><div><h2>Browser shortcut</h2><p>Open your browser from the globe button on any page.</p></div></div>
+<section class="panel" id="browser" data-settings-panel="browser" aria-label="Browser" hidden="@(Model.ActiveTab != "browser")">
+    <div class="panel-heading"><span class="step-number" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="4" ry="9" /><path d="M3 12h18" /></svg></span><div><h2>Browser shortcut</h2></div></div>
     @if (!string.IsNullOrWhiteSpace(Model.BrowserExecutable))
     {
         <dl class="settings-list"><div><dt>Browser executable</dt><dd class="storage-path-row"><code>@Model.BrowserExecutable</code></dd></div></dl>
     }
     else
     {
-        <p class="helper">No browser selected. Choose your browser's .exe to enable the header shortcut.</p>
+        <p class="settings-status">No browser selected.</p>
     }
     <div class="actions">
-        <form method="post" asp-page-handler="ChooseBrowser" data-busy-form data-busy-label="Choosing…"><button type="submit" class="button secondary">@(string.IsNullOrWhiteSpace(Model.BrowserExecutable) ? "Choose browser…" : "Change browser…")</button></form>
+        <form method="post" asp-route-tab="browser" asp-page-handler="ChooseBrowser" data-busy-form data-busy-label="Choosing…"><button type="submit" class="button secondary">@(string.IsNullOrWhiteSpace(Model.BrowserExecutable) ? "Choose browser…" : "Change browser…")</button></form>
         @if (!string.IsNullOrWhiteSpace(Model.BrowserExecutable))
         {
-            <form method="post" asp-page-handler="ClearBrowser"><button type="submit" class="button danger">Clear selection</button></form>
+            <form method="post" asp-route-tab="browser" asp-page-handler="ClearBrowser"><button type="submit" class="button danger">Clear selection</button></form>
         }
     </div>
-    <p class="helper">Saved for this launcher only; your Windows default browser is unchanged. Clearing this selection does not delete or uninstall your browser.</p>
+    <details class="settings-help">
+        <summary>About the browser shortcut</summary>
+        <div class="settings-help-copy"><p>Open your browser from the globe button on any page.</p><p>Saved for this launcher only; your Windows default browser is unchanged. Clearing this selection does not delete or uninstall your browser.</p></div>
+    </details>
 </section>
 
-<section class="panel">
-    <div class="panel-heading"><span class="step-number" aria-hidden="true">↗</span><div><h2>Startup &amp; display</h2><p>Make this your first stop when you sign in, or open straight into a fullscreen library.</p></div></div>
-    <form method="post" asp-page-handler="Startup" data-busy-form data-busy-label="Saving…">
+<section class="panel" id="startup" data-settings-panel="startup" aria-label="Startup &amp; display" hidden="@(Model.ActiveTab != "startup")">
+    <div class="panel-heading"><span class="step-number" aria-hidden="true">↗</span><div><h2>Startup &amp; display</h2></div></div>
+    <form method="post" asp-route-tab="startup" asp-page-handler="Startup" data-busy-form data-busy-label="Saving…">
         <label class="check-label"><input asp-for="StartWithWindows" /> Start with Windows</label>
-        <p class="helper">Register Launchpad to open when you sign in to this Windows account. No administrator access is needed. Windows Settings → Apps → Startup can still disable it; this checkbox shows registration, not Windows' enabled/disabled override.</p>
-        <p class="helper">This uses the current GameLauncher.exe location. Enable it from your permanent installed copy, not a temporary build folder. If you move the app, save this setting again from its new location. Turn it off before deleting a standalone copy.</p>
+        <details class="settings-help">
+            <summary>How Windows startup works</summary>
+            <div class="settings-help-copy"><p>Register Launchpad to open when you sign in to this Windows account. No administrator access is needed. Windows Settings → Apps → Startup can still disable it; this checkbox shows registration, not Windows' enabled/disabled override.</p>
+        <p>This uses the current GameLauncher.exe location. Enable it from your permanent installed copy, not a temporary build folder. If you move the app, save this setting again from its new location. Turn it off before deleting a standalone copy.</p></div>
+        </details>
         <button type="submit" class="button secondary">Save startup preference</button>
     </form>
     <hr class="settings-divider" />
-    <form method="post" asp-page-handler="Display" data-busy-form data-busy-label="Saving…">
+    <form method="post" asp-route-tab="startup" asp-page-handler="Display" data-busy-form data-busy-label="Saving…">
         <label class="check-label"><input asp-for="LaunchFullscreen" /> Launch in fullscreen</label>
-        <p class="helper">Applies next time the app opens, including Windows startup. Fullscreen fills the current monitor without a title bar or window borders; it does not change your display resolution or stay above other apps.</p>
-        <p class="helper">Press F11 or use the top-bar fullscreen button to switch at any time. That temporary switch does not change this saved preference. The top-bar close button and Alt+F4 still exit the launcher.</p>
+        <details class="settings-help">
+            <summary>How fullscreen works</summary>
+            <div class="settings-help-copy"><p>Applies next time the app opens, including Windows startup. Fullscreen fills the current monitor without a title bar or window borders; it does not change your display resolution or stay above other apps.</p>
+        <p>Press F11 or use the top-bar fullscreen button to switch at any time. That temporary switch does not change this saved preference. The top-bar close button and Alt+F4 still exit the launcher.</p></div>
+        </details>
         <button type="submit" class="button secondary">Save display preference</button>
     </form>
 </section>
 
-<section class="panel">
-    <div class="panel-heading"><span class="step-number" aria-hidden="true">⚿</span><div><h2>Artwork provider</h2><p>Artwork is optional. Your key is encrypted for your Windows account on this device and never shown again.</p></div></div>
+<section class="panel" id="artwork" data-settings-panel="artwork" aria-label="Artwork" hidden="@(Model.ActiveTab != "artwork")">
+    <div class="panel-heading"><span class="step-number" aria-hidden="true">⚿</span><div><h2>Artwork provider</h2></div></div>
     <div class="provider-status @(Model.HasSgdbKey ? "has-key" : "no-key")">
         <div class="provider-status-copy">
             <span class="provider-status-icon" aria-hidden="true">
@@ -70,30 +103,33 @@
                     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5m0-9v1" /></svg>
                 }
             </span>
-            <div><span class="provider-status-name">SteamGridDB</span><strong>@(Model.HasSgdbKey ? "API key saved" : "No API key set")</strong><p>@(Model.HasSgdbKey ? "Stored securely for your Windows account. Check the connection to verify it." : "Add a key to search for artwork, or keep using your own local images.")</p></div>
+            <div><span class="provider-status-name">SteamGridDB</span><strong>@(Model.HasSgdbKey ? "API key saved" : "No API key set")</strong></div>
         </div>
         @if (Model.HasSgdbKey)
         {
             <div class="provider-status-actions">
-                <form method="post" asp-page-handler="Check" data-busy-form data-busy-label="Checking…"><button class="button secondary" type="submit">Check connection</button></form>
-                <form method="post" asp-page-handler="Remove"><button class="button danger" type="submit">Remove key</button></form>
+                <form method="post" asp-route-tab="artwork" asp-page-handler="Check" data-busy-form data-busy-label="Checking…"><button class="button secondary" type="submit">Check connection</button></form>
+                <form method="post" asp-route-tab="artwork" asp-page-handler="Remove"><button class="button danger" type="submit">Remove key</button></form>
             </div>
         }
     </div>
-    <form method="post" asp-page-handler="Save" class="provider-key-form" data-busy-form data-busy-label="Saving…">
+    <form method="post" asp-route-tab="artwork" asp-page-handler="Save" class="provider-key-form" data-busy-form data-busy-label="Saving…">
         <div class="field">
             <label for="ApiKey">@(Model.HasSgdbKey ? "Replace key" : "SteamGridDB API key")</label>
             <div class="input-action">
                 <input id="ApiKey" asp-for="ApiKey" type="password" autocomplete="off" placeholder="Paste your key here" />
                 <button class="button primary" type="submit">@(Model.HasSgdbKey ? "Replace" : "Save")</button>
             </div>
-            <small>Get one at steamgriddb.com → Profile → Preferences → API. Without a key you can still add local images per game.</small>
+            <details class="settings-help">
+                <summary>Artwork setup &amp; API key help</summary>
+                <div class="settings-help-copy"><p>Artwork is optional. Your key is encrypted for your Windows account on this device and never shown again.</p><p>A saved key is not necessarily valid. Use Check connection to verify it with SteamGridDB.</p><p>Get one at steamgriddb.com → Profile → Preferences → API. Without a key you can still add local images per game.</p></div>
+            </details>
         </div>
     </form>
 </section>
 
-<section class="panel">
-    <div class="panel-heading"><span class="step-number" aria-hidden="true">⌂</span><div><h2>Local storage</h2><p>Your library is stored on this Windows device.</p></div></div>
+<section class="panel" id="storage" data-settings-panel="storage" aria-label="Local storage" hidden="@(Model.ActiveTab != "storage")">
+    <div class="panel-heading"><span class="step-number" aria-hidden="true">⌂</span><div><h2>Local storage</h2></div></div>
     <dl class="settings-list">
         @foreach (var location in new[] {
             (Id: "data", Label: "Data directory", Path: Model.DataDirectory, Action: "Open data directory in File Explorer"),
@@ -104,7 +140,7 @@
                 <dt>@location.Label</dt>
                 <dd class="storage-path-row">
                     <code>@location.Path</code>
-                    <form method="post" asp-page-handler="OpenLocation">
+                    <form method="post" asp-route-tab="storage" asp-page-handler="OpenLocation">
                         <input type="hidden" name="location" value="@location.Id" />
                         <button type="submit" class="storage-open-button" aria-label="@location.Action" title="@location.Action">
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2M3 7h6l2 3h11l-3 10H3L1 10h3" /></svg>
@@ -114,6 +150,9 @@
             </div>
         }
     </dl>
-    <p class="helper">To make a backup, close Launchpad before copying its data directory. Removing a library entry never removes the executable itself.</p>
+    <details class="settings-help">
+        <summary>Storage &amp; backup help</summary>
+        <div class="settings-help-copy"><p>Your library is stored on this Windows device.</p><p>To make a backup, close Launchpad before copying its data directory. Removing a library entry never removes the executable itself.</p></div>
+    </details>
 </section>
-<section class="panel"><h2>What this version supports</h2><div class="capability-grid"><div><span class="capability-label">AVAILABLE</span><h3>Your launch files, organized</h3><p>Launch games, emulator executables and tools with custom arguments and working directories. Search, favorite, import from folder scans, and assign covers and background images.</p></div><div><span class="capability-label muted">NOT YET IMPLEMENTED</span><h3>No hidden integrations</h3><p>Metadata descriptions, genres, cloud sync and emulator ROM profiles are not included. Storefront accounts are not connected.</p></div></div></section>
+<section class="panel" id="about" data-settings-panel="about" aria-label="About" hidden="@(Model.ActiveTab != "about")"><h2>What this version supports</h2><div class="capability-grid"><div><span class="capability-label">AVAILABLE</span><h3>Your launch files, organized</h3><p>Launch games, emulator executables and tools with custom arguments and working directories. Search, favorite, import from folder scans, and assign covers and background images.</p></div><div><span class="capability-label muted">NOT YET IMPLEMENTED</span><h3>No hidden integrations</h3><p>Metadata descriptions, genres, cloud sync and emulator ROM profiles are not included. Storefront accounts are not connected.</p></div></div></section>

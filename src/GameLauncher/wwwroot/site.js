@@ -1,4 +1,85 @@
 "use strict";
+// Settings navigation swaps existing panels so unsaved fields survive section changes.
+(() => {
+  const nav = document.querySelector('[data-settings-nav]');
+  if (!nav) return;
+  const links = Array.from(nav.querySelectorAll('[data-settings-tab]'));
+  const panels = Array.from(document.querySelectorAll('[data-settings-panel]'));
+  const select = (id) => {
+    if (!links.some((link) => link.dataset.settingsTab === id)) return;
+    panels.forEach((panel) => { panel.hidden = panel.dataset.settingsPanel !== id; });
+    links.forEach((link) => {
+      if (link.dataset.settingsTab === id) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    });
+  };
+  links.forEach((link) => link.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    select(link.dataset.settingsTab);
+    // Drop any previous POST-handler query; each form keeps its own explicit section.
+    window.history.replaceState(null, '', link.href);
+  }));
+})();
+// Artwork POSTs replace only their region, never the user's unsaved entry fields.
+(() => {
+  let pending = false;
+  document.addEventListener('submit', async (event) => {
+    const form = event.target;
+    const region = form.closest('#entry-artwork');
+    if (!region) {
+      if (pending && form.matches('form.editor')) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+      return;
+    }
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (pending) return;
+    pending = true;
+    const body = new FormData(form);
+    const buttons = Array.from(region.querySelectorAll('button'));
+    const editorButtons = Array.from(document.querySelectorAll('form.editor button[type="submit"]'));
+    const lockedButtons = [...buttons, ...editorButtons].filter((button) => !button.disabled);
+    const focusIndex = buttons.indexOf(event.submitter);
+    const collapsed = Array.from(region.querySelectorAll('details')).map((item) => !item.open);
+    const scrollY = window.scrollY;
+    const message = document.createElement('p');
+    message.className = 'notice';
+    message.setAttribute('role', 'status');
+    message.textContent = form.dataset.busyLabel || 'Updating artwork…';
+    region.prepend(message);
+    region.setAttribute('aria-busy', 'true');
+    lockedButtons.forEach((button) => { button.disabled = true; });
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST', body, credentials: 'same-origin',
+        headers: { 'X-Entry-Artwork': 'true' }
+      });
+      if (!response.ok) throw new Error(`Artwork request failed (${response.status}).`);
+      const documentFragment = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const updated = documentFragment.querySelector('#entry-artwork');
+      if (!updated) throw new Error('The artwork response could not be displayed.');
+      region.replaceWith(updated);
+      updated.querySelectorAll('details').forEach((item, index) => {
+        if (collapsed[index] !== undefined) item.open = !collapsed[index];
+      });
+      const sameAction = Array.from(updated.querySelectorAll('form')).find((item) => item.action === form.action);
+      const focus = sameAction ? updated.querySelectorAll('button')[focusIndex] :
+        updated.querySelector('input:not([type="hidden"]), .match-row button, .artwork-section summary');
+      (focus || updated).focus({ preventScroll: true });
+      window.scrollTo({ top: scrollY, behavior: 'instant' });
+    } catch (error) {
+      message.setAttribute('role', 'alert');
+      message.textContent = `${error.message} Your entry edits are still here. If applying artwork, check the preview before retrying; the change may already have been saved.`;
+    } finally {
+      pending = false;
+      region.removeAttribute('aria-busy');
+      lockedButtons.forEach((button) => { button.disabled = false; });
+    }
+  }, true);
+})();
 // QR images are generated locally in the authenticated POST response; no code enters a URL or storage.
 (() => {
   const pairing = document.querySelector('[data-companion-pairing]');
@@ -119,9 +200,10 @@ document.querySelectorAll("[data-toast]").forEach((toast) => {
       // Do not let busy handlers disable a form before the user confirms.
       event.stopImmediatePropagation();
       if (dialog.open) return;
-      pending = { form, submitter: event.submitter, focus: document.activeElement };
+      pending = { form, submitter: event.submitter,
+        focus: form.closest('.overlay-menu')?.querySelector('.menu-trigger') || document.activeElement };
       const shutdown = !!form.querySelector('[data-power-start]');
-      dialog.querySelector('#confirmation-title').textContent = shutdown ? 'Shut down PC?' : 'Confirm action';
+      dialog.querySelector('#confirmation-title').textContent = form.dataset.confirmTitle || (shutdown ? 'Shut down PC?' : 'Confirm action');
       dialog.querySelector('[data-confirm-message]').textContent = form.dataset.confirm;
       dialog.querySelector('[data-confirm-accept]').textContent = shutdown ? 'Start 15-second countdown' : 'Confirm';
       dialog.showModal();
@@ -143,7 +225,7 @@ document.querySelectorAll("[data-toast]").forEach((toast) => {
       banner.querySelector('[data-power-banner-text]').textContent = countdown + ' Save your work. Apps will not be forced closed.';
       document.querySelectorAll('[data-power-message]').forEach((el) => { el.textContent = state.message; });
       document.querySelectorAll('[data-power-countdown]').forEach((el) => { el.textContent = countdown; });
-      document.querySelectorAll('[data-power-start]').forEach((el) => { el.disabled = state.pending || state.dispatching; });
+      document.querySelectorAll('[data-power-start], [data-power-local]').forEach((el) => { el.disabled = state.pending || state.dispatching; });
       document.querySelectorAll('[data-power-cancel]').forEach((el) => { el.disabled = !state.pending; });
     } catch {
       // A disconnected window is not evidence that the machine powered off or cancellation succeeded.
@@ -151,7 +233,7 @@ document.querySelectorAll("[data-toast]").forEach((toast) => {
         el.textContent = 'Power status unavailable. A previous countdown may still be active; cancellation is not confirmed.';
       });
       if (!banner.hidden) banner.querySelector('[data-power-banner-text]').textContent = 'Shutdown status unavailable. The countdown may still be active.';
-      document.querySelectorAll('[data-power-start]').forEach((el) => { el.disabled = true; });
+      document.querySelectorAll('[data-power-start], [data-power-local]').forEach((el) => { el.disabled = true; });
     } finally { window.setTimeout(poll, 1000); }
   };
   poll();
@@ -218,6 +300,42 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
   boxes.forEach((box) => box.addEventListener("change", update));
   update();
 });
+
+// Browse path buttons on Edit page
+document.querySelectorAll(".browse-path").forEach((button) => {
+  button.addEventListener("click", async (event) => {
+    event.preventDefault();
+    const kind = button.dataset.browseKind;
+    if (!kind) return;
+    const input = button.closest(".input-action").querySelector("input");
+    const originalText = button.innerHTML;
+    button.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="spinner"><circle cx="12" cy="12" r="10" stroke-opacity="0.25" /><path d="M12 2a10 10 0 0 1 10 10" stroke-opacity="1"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite" /></path></svg>';
+    button.disabled = true;
+    try {
+      const response = await fetch("/Edit?handler=BrowsePath", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "RequestVerificationToken": document.querySelector('input[name="__RequestVerificationToken"]')?.value || "" },
+        body: new URLSearchParams({ kind }),
+        credentials: "same-origin"
+      });
+      if (!response.ok) throw new Error(`Browse request failed (${response.status}).`);
+      const data = await response.json();
+      if (data.path) {
+        input.value = data.path;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      } else if (data.error) {
+        alert(data.error);
+      }
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      button.innerHTML = originalText;
+      button.disabled = false;
+    }
+  });
+});
+
 // Directional keyboard and standard-mapped controller navigation share actions.
 (() => {
   let keyboardActive = false;
@@ -303,19 +421,19 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
     document.querySelectorAll('.submenu-trigger[aria-expanded="true"]').forEach((trigger) => setSubmenu(trigger, false));
   };
   const openMenu = (card = document.activeElement.closest('.entry-card'), touch = false) => {
-    const menu = card?.querySelector('.overlay-menu');
+    const menu = card?.matches('.overlay-menu') ? card : card?.querySelector('.overlay-menu');
     if (!menu) return;
     closeMenus();
     menu.classList.add('is-open');
     menu.querySelector('.menu-trigger').setAttribute('aria-expanded', 'true');
     if (touch) menu.querySelector('.menu-item')?.focus({ preventScroll: true });
-    else focus(menu.querySelector('.menu-item'));
+    else focus(menu.querySelector('.menu-item:not(:disabled)') || menu.querySelector('.menu-trigger'));
   };
   document.querySelectorAll('.menu-trigger').forEach((button) => {
     button.addEventListener('click', () => {
       const wasOpen = button.closest('.overlay-menu').classList.contains('is-open');
       closeMenus();
-      if (!wasOpen) openMenu(button.closest('.entry-card'));
+      if (!wasOpen) openMenu(button.closest('.overlay-menu'));
     });
   });
   document.addEventListener('focusin', (event) => {
@@ -451,6 +569,10 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
     if (menu) {
       // Collapsed submenu items are [hidden], so visible() keeps up/down to the expanded list.
       const items = Array.from(menu.querySelectorAll('.menu-item, .submenu-item')).filter(visible);
+      if (!items.length) {
+        if (direction === 'left') { closeMenus(); focus(menu.querySelector('.menu-trigger')); }
+        return;
+      }
       const index = items.indexOf(active);
       const trigger = active.closest('.menu-submenu')?.querySelector('.submenu-trigger');
       if (direction === 'up' || direction === 'down') {
@@ -465,7 +587,7 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
         setSubmenu(active, false);
       } else if (direction !== 'right') {
         closeMenus();
-        focus(menu.closest('.entry-card').querySelector('.overlay-play button'));
+        focus(menu.closest('.entry-card')?.querySelector('.overlay-play button') || menu.querySelector('.menu-trigger'));
       }
       return;
     }
@@ -508,7 +630,7 @@ document.querySelectorAll("[data-import-form]").forEach((form) => {
       focus(trigger);
     } else if (menu) {
       closeMenus();
-      focus(menu.closest('.entry-card').querySelector('.overlay-play button'));
+      focus(menu.closest('.entry-card')?.querySelector('.overlay-play button') || menu.querySelector('.menu-trigger'));
     } else {
       // Follow a safe GET link, never replay history containing a POST.
       document.querySelector('a.back-link')?.click();

@@ -20,6 +20,7 @@ public sealed class PcPowerService : BackgroundService
     private readonly CompanionAccess _access;
     private readonly object _gate = new();
     private bool _allowRemote;
+    private bool _showFirmwareRestart;
     private bool _dispatching;
     private bool _stopped;
     private long? _started;
@@ -32,9 +33,75 @@ public sealed class PcPowerService : BackgroundService
         _access = access;
         using var key = Registry.CurrentUser.OpenSubKey(RegistryPath);
         _allowRemote = key?.GetValue("AllowRemoteShutdown") is int value && value == 1;
+        _showFirmwareRestart = key?.GetValue("ShowFirmwareRestart") is int firmware && firmware == 1;
     }
 
     public bool AllowRemoteShutdown { get { lock (_gate) return _allowRemote; } }
+    public bool ShowFirmwareRestart { get { lock (_gate) return _showFirmwareRestart; } }
+
+    public void SetShowFirmwareRestart(bool show)
+    {
+        lock (_gate)
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(RegistryPath, writable: true)
+                ?? throw new InvalidOperationException("Power preferences could not be opened.");
+            key.SetValue("ShowFirmwareRestart", show ? 1 : 0, RegistryValueKind.DWord);
+            if (key.GetValue("ShowFirmwareRestart") is not int saved || saved != (show ? 1 : 0))
+                throw new InvalidOperationException("Power preferences could not be verified.");
+            _showFirmwareRestart = show;
+        }
+    }
+
+    // Desktop-only actions. The companion continues to expose shutdown alone.
+    public async Task<string> RequestLocalActionAsync(string action)
+    {
+        if (action is not ("restart" or "sleep" or "firmware"))
+            throw new ArgumentException("Choose a valid PC power action.");
+        lock (_gate)
+        {
+            ValidatePending();
+            if (_stopped || _started.HasValue || _dispatching)
+                throw new InvalidOperationException("Another power action is pending, or Launchpad is closing. Cancel any shutdown countdown first.");
+            if (action == "firmware" && !_showFirmwareRestart)
+                throw new InvalidOperationException("Enable the UEFI / BIOS option in Settings → PC power first.");
+            _dispatching = true;
+            _revision++;
+        }
+        try
+        {
+            if (action == "sleep")
+            {
+                var accepted = await Task.Run(() => System.Windows.Forms.Application.SetSuspendState(
+                    System.Windows.Forms.PowerState.Suspend, force: false, disableWakeEvent: false));
+                if (!accepted) throw new InvalidOperationException("Windows did not accept the sleep request. Check this device's power settings.");
+                return "Sleep requested from Windows.";
+            }
+            var firmware = action == "firmware";
+            var start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "shutdown.exe"))
+            {
+                // Only the firmware command elevates; the launcher remains unelevated.
+                UseShellExecute = firmware,
+                Verb = firmware ? "runas" : "",
+                CreateNoWindow = true
+            };
+            start.ArgumentList.Add("/r");
+            if (firmware) start.ArgumentList.Add("/fw");
+            start.ArgumentList.Add("/t");
+            start.ArgumentList.Add("0"); // No /f or positive timeout: never force apps closed.
+            using var process = await Task.Run(() => Process.Start(start))
+                ?? throw new InvalidOperationException("Windows did not start the restart command.");
+            try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5)); }
+            catch (TimeoutException)
+            {
+                return "Restart request was sent, but its result is unavailable. Check Windows before trying again.";
+            }
+            if (process.ExitCode != 0)
+                throw new InvalidOperationException($"Windows did not accept the restart request (code {process.ExitCode}). Check permissions, blocked apps, and firmware support.");
+            return firmware ? "Restart to UEFI / BIOS requested. Firmware support determines the screen shown."
+                : "Restart requested from Windows. Apps may block it; restart is not confirmed.";
+        }
+        finally { lock (_gate) { _dispatching = false; _revision++; } }
+    }
 
     public void SetRemotePermission(bool allow)
     {
@@ -69,7 +136,7 @@ public sealed class PcPowerService : BackgroundService
             if (remoteGeneration.HasValue && (!_allowRemote || !_access.IsGenerationCurrent(remoteGeneration.Value)))
                 throw new InvalidOperationException("Shutdown from Launchpad Companion is disabled or pairing changed. On your PC, open Launchpad → Settings → PC power, enable ‘Allow shutdown from Launchpad Companion’, and select ‘Save power preferences’. If already enabled, pair Launchpad Companion again.");
             ValidatePending();
-            if (_dispatching) throw new InvalidOperationException("A shutdown request is already being sent to Windows.");
+            if (_dispatching) throw new InvalidOperationException("A power request is already being sent to Windows.");
             // Repeated requests never reset or extend an existing countdown.
             if (!_started.HasValue)
             {

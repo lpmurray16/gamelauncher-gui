@@ -37,26 +37,35 @@
                 </a>
             }
             <a class="nav-link @(active == "Collections" ? "active" : "")" asp-page="/Collections" aria-current="@(active == "Collections" ? "page" : null)"><span class="nav-icon" aria-hidden="true">⚿</span>Collections</a>
-            <a class="nav-link @(active == "Settings" ? "active" : "")" asp-page="/Settings" aria-current="@(active == "Settings" ? "page" : null)"><span class="nav-icon" aria-hidden="true">⚙</span>Settings</a>
         </nav>
-        <div class="sidebar-footer"><span class="status-dot"></span> Local by design<small>Your library. Your machine.</small></div>
+        <div class="sidebar-footer">
+            <a class="nav-link @(active == "Settings" ? "active" : "")" asp-page="/Settings" aria-current="@(active == "Settings" ? "page" : null)"><span class="nav-icon" aria-hidden="true">⚙</span>Settings</a>
+        </div>
     </aside>
     <main id="main" class="main" tabindex="-1">
         <div class="topline">
-            @if (browserError is not null)
-            {
-                <a class="browser-button" asp-page="/Settings" asp-fragment="browser" title="@browserError">Setup browser</a>
-            }
-            else
-            {
-                <form method="post" asp-page="/Settings" asp-page-handler="@(hasBrowser ? "LaunchBrowser" : "ChooseBrowser")" class="browser-shortcut" data-busy-form data-busy-label="@(hasBrowser ? "Opening…" : "Choosing…")">
+            <div class="header-shortcuts">
+                @if (browserError is not null)
+                {
+                    <a class="browser-button" asp-page="/Settings" asp-route-tab="browser" title="@browserError">Setup browser</a>
+                }
+                else
+                {
+                    <form method="post" asp-page="/Settings" asp-page-handler="@(hasBrowser ? "LaunchBrowser" : "ChooseBrowser")" class="browser-shortcut" data-busy-form data-busy-label="@(hasBrowser ? "Opening…" : "Choosing…")">
+                        <input type="hidden" name="returnUrl" value="@(Context.Request.PathBase.ToString() + Context.Request.Path.ToString() + Context.Request.QueryString.ToString())" />
+                        <button type="submit" class="browser-button" aria-label="@(hasBrowser ? "Launch browser" : "Setup browser")" title="@(hasBrowser ? "Launch browser · Change in Settings" : "Choose your browser executable")">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="4" ry="9" /><path d="M3 12h18" /></svg>
+                            <span>@(hasBrowser ? "Browser" : "Setup browser")</span>
+                        </button>
+                    </form>
+                }
+                <form method="post" asp-page="/Settings" asp-page-handler="OpenExplorer" class="browser-shortcut">
                     <input type="hidden" name="returnUrl" value="@(Context.Request.PathBase.ToString() + Context.Request.Path.ToString() + Context.Request.QueryString.ToString())" />
-                    <button type="submit" class="browser-button" aria-label="@(hasBrowser ? "Launch browser" : "Setup browser")" title="@(hasBrowser ? "Launch browser · Change in Settings" : "Choose your browser executable")">
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="4" ry="9" /><path d="M3 12h18" /></svg>
-                        <span>@(hasBrowser ? "Browser" : "Setup browser")</span>
+                    <button type="submit" class="browser-button" aria-label="Open File Explorer" title="Open File Explorer">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2M3 7h6l2 3h11l-3 10H3L1 10h3" /></svg>
                     </button>
                 </form>
-            }
+            </div>
             <form method="get" asp-page="/GlobalSearch" class="global-search" role="search" aria-label="Search all libraries">
                 <label class="sr-only" for="global-search">Search Games, Tools and Emulators</label>
                 <input id="global-search" type="search" name="q" value="@(ViewData["GlobalQuery"] as string)" placeholder="Search all libraries…" maxlength="200" />
@@ -65,11 +74,28 @@
                 </button>
             </form>
             <div class="window-controls" aria-label="Power and window controls">
-                <form method="post" asp-page="/Power" asp-page-handler="Shutdown" class="power-shortcut" data-confirm="Shut down @System.Environment.MachineName in 15 seconds? Save your work first. You can cancel during the countdown; apps will not be forced closed.">
-                    <button type="submit" data-power-start disabled="@(powerStatus.Pending || powerStatus.Dispatching)" aria-label="Shut down PC" title="Shut down PC — 15-second cancellable countdown">
+                <div class="overlay-menu power-shortcut">
+                    <button type="button" class="menu-trigger" aria-expanded="false" aria-haspopup="menu" aria-controls="power-menu" aria-label="PC power options" title="PC power options">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 2v10M6.3 5.3a9 9 0 1 0 11.4 0" /></svg>
                     </button>
-                </form>
+                    <div class="menu-dropdown" id="power-menu" role="menu" aria-label="PC power">
+                        <form method="post" asp-page="/Power" asp-page-handler="Shutdown" data-confirm="Shut down @System.Environment.MachineName in 15 seconds? Save your work first. You can cancel during the countdown; apps will not be forced closed.">
+                            <button type="submit" class="menu-item" role="menuitem" data-power-start disabled="@(powerStatus.Pending || powerStatus.Dispatching)">Shut down</button>
+                        </form>
+                        <form method="post" asp-page="/Power" asp-page-handler="Sleep" data-confirm="Put this PC to sleep now?" data-confirm-title="Sleep PC?">
+                            <button type="submit" class="menu-item" role="menuitem" data-power-local disabled="@(powerStatus.Pending || powerStatus.Dispatching)">Sleep</button>
+                        </form>
+                        <form method="post" asp-page="/Power" asp-page-handler="Restart" data-confirm="Restart this PC now? Save your work first. Apps will not be forced closed. There is no countdown for restart." data-confirm-title="Restart PC?">
+                            <button type="submit" class="menu-item" role="menuitem" data-power-local disabled="@(powerStatus.Pending || powerStatus.Dispatching)">Restart</button>
+                        </form>
+                        @if (Power.ShowFirmwareRestart)
+                        {
+                            <form method="post" asp-page="/Power" asp-page-handler="Firmware" data-confirm="Restart into UEFI / BIOS settings now? Save your work first. Windows will ask for administrator approval. On supported PCs this opens firmware settings, not necessarily the boot-device picker. There is no countdown." data-confirm-title="Restart to UEFI / BIOS?">
+                                <button type="submit" class="menu-item" role="menuitem" data-power-local disabled="@(powerStatus.Pending || powerStatus.Dispatching)">Restart to UEFI / BIOS…</button>
+                            </form>
+                        }
+                    </div>
+                </div>
                 <button type="button" data-window-fullscreen aria-label="Enter fullscreen (F11)" title="Enter fullscreen (F11)" aria-pressed="false">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /></svg>
                 </button>
@@ -86,7 +112,7 @@
             <p data-power-banner-text role="status">Shutdown in approximately @powerStatus.RemainingSeconds seconds. Save your work. Apps will not be forced closed.</p>
             <div class="actions">
                 <form method="post" asp-page="/Power" asp-page-handler="Cancel"><button type="submit" class="button primary" data-power-cancel disabled="@(!powerStatus.Pending)">Cancel shutdown</button></form>
-                <a class="button secondary" asp-page="/Power">PC power</a>
+                <a class="button secondary" asp-page="/Settings" asp-route-tab="power">PC power</a>
             </div>
         </section>
         @RenderBody()

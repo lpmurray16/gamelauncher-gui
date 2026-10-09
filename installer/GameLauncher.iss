@@ -1,6 +1,6 @@
 ; Build with scripts/Build-Installer.ps1. Keep AppId stable across upgrades.
 #ifndef AppVersion
-  #define AppVersion "1.6.0"
+  #define AppVersion "1.7.0"
 #endif
 #define AppName "Launchpad"
 #define PublishDir SourcePath + "..\artifacts\publish\win-x64"

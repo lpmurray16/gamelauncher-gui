@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace GameLauncher.Pages;
 
-public sealed class SettingsModel : UiPageModel
+public sealed partial class SettingsModel : UiPageModel
 {
     private readonly AppPaths _paths;
     private readonly CredentialStore _credentials;
@@ -11,8 +11,10 @@ public sealed class SettingsModel : UiPageModel
     private readonly DesktopPreferences _desktop;
     private readonly BrowserLauncher _browser;
     private readonly FolderPicker _picker;
-    public SettingsModel(AppPaths paths, CredentialStore credentials, SteamGridDbClient provider, DesktopPreferences desktop, BrowserLauncher browser, FolderPicker picker)
-    { _paths = paths; _credentials = credentials; _provider = provider; _desktop = desktop; _browser = browser; _picker = picker; }
+    private readonly PcPowerService _power;
+    private readonly GameLauncher.Companion.CompanionAccess _companion;
+    public SettingsModel(AppPaths paths, CredentialStore credentials, SteamGridDbClient provider, DesktopPreferences desktop, BrowserLauncher browser, FolderPicker picker, PcPowerService power, GameLauncher.Companion.CompanionAccess companion)
+    { _paths = paths; _credentials = credentials; _provider = provider; _desktop = desktop; _browser = browser; _picker = picker; _power = power; _companion = companion; }
 
     public string? BrowserExecutable { get; private set; }
 
@@ -24,11 +26,37 @@ public sealed class SettingsModel : UiPageModel
 
     [BindProperty] public bool StartWithWindows { get; set; }
     [BindProperty] public bool LaunchFullscreen { get; set; }
+    [BindProperty] public bool ShowFirmwareRestart { get; set; }
+    public bool AllowRemoteShutdown => _power.AllowRemoteShutdown;
+    public string ComputerName => Environment.MachineName;
+    public GameLauncher.Contracts.PowerStatusDto PowerStatus => _power.Status();
 
-    public void OnGet() => LoadDesktopPreferences();
+    [BindProperty(SupportsGet = true)] public string? Tab { get; set; }
+    public string ActiveTab => Tab switch
+    {
+        "startup" or "power" or "browser" or "companion" or "artwork" or "storage" or "about" => Tab,
+        _ => Request.Query["handler"].ToString() switch
+        {
+            "PowerMenu" => "power",
+            "ChooseBrowser" or "ClearBrowser" or "LaunchBrowser" => "browser",
+            "Save" or "Remove" or "Check" => "artwork",
+            "OpenLocation" => "storage",
+            _ => "startup"
+        }
+    };
+
+    private IActionResult ReturnToSettings() => RedirectToPage(new { tab = ActiveTab });
+
+    public void OnGet()
+    {
+        if (TempData["SettingsError"] is string error) ModelState.AddModelError(string.Empty, error);
+        LoadDesktopPreferences();
+    }
 
     private void LoadDesktopPreferences()
     {
+        LoadCompanionPreferences();
+        ShowFirmwareRestart = _power.ShowFirmwareRestart;
         try { BrowserExecutable = _browser.ExecutablePath; }
         catch (Exception error) when (IsExpected(error)) { ShowError(error); }
         try { StartWithWindows = _desktop.StartupRegistered; LaunchFullscreen = _desktop.LaunchFullscreen; }
@@ -59,7 +87,7 @@ public sealed class SettingsModel : UiPageModel
         {
             _browser.SetExecutable(null);
             TempData["Notice"] = "Browser selection cleared. No files were removed.";
-            return RedirectToPage();
+            return ReturnToSettings();
         }
         catch (Exception error) when (IsExpected(error))
         { ShowError(error); LoadDesktopPreferences(); return Page(); }
@@ -79,7 +107,33 @@ public sealed class SettingsModel : UiPageModel
 
     private IActionResult ReturnToLauncher(string? returnUrl) =>
         !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
-            ? LocalRedirect(returnUrl) : RedirectToPage();
+            ? LocalRedirect(returnUrl) : ReturnToSettings();
+
+    public IActionResult OnPostPowerMenu()
+    {
+        ModelState.Remove(nameof(ApiKey));
+        if (!ModelState.IsValid) { LoadDesktopPreferences(); return Page(); }
+        try
+        {
+            _power.SetShowFirmwareRestart(ShowFirmwareRestart);
+            TempData["Notice"] = "Power menu preference saved.";
+            return ReturnToSettings();
+        }
+        catch (Exception error) when (IsExpected(error) || error is System.Security.SecurityException)
+        { ShowError(error); LoadDesktopPreferences(); return Page(); }
+    }
+
+    public IActionResult OnPostOpenExplorer(string? returnUrl)
+    {
+        ModelState.Clear();
+        try
+        {
+            _paths.OpenFileExplorer();
+            return ReturnToLauncher(returnUrl);
+        }
+        catch (Exception error) when (IsExpected(error))
+        { ShowError(error); LoadDesktopPreferences(); return Page(); }
+    }
 
     public IActionResult OnPostOpenLocation(string location)
     {
@@ -88,7 +142,7 @@ public sealed class SettingsModel : UiPageModel
         try
         {
             _paths.OpenInExplorer(location);
-            return RedirectToPage();
+            return ReturnToSettings();
         }
         catch (Exception error) when (IsExpected(error))
         { ShowError(error); LoadDesktopPreferences(); return Page(); }
@@ -104,7 +158,7 @@ public sealed class SettingsModel : UiPageModel
             TempData["Notice"] = StartWithWindows
                 ? "Startup registered for your Windows account. Windows Startup apps can still disable it."
                 : "Removed from Windows startup.";
-            return RedirectToPage();
+            return ReturnToSettings();
         }
         catch (Exception error) when (IsExpected(error))
         { ShowError(error); LoadDesktopPreferences(); return Page(); }
@@ -118,7 +172,7 @@ public sealed class SettingsModel : UiPageModel
         {
             _desktop.SetLaunchFullscreen(LaunchFullscreen);
             TempData["Notice"] = "Launch display preference saved. Applies next time the app opens; use F11 to switch now.";
-            return RedirectToPage();
+            return ReturnToSettings();
         }
         catch (Exception error) when (IsExpected(error))
         { ShowError(error); LoadDesktopPreferences(); return Page(); }
@@ -133,20 +187,20 @@ public sealed class SettingsModel : UiPageModel
 
         }
         catch (Exception error) when (IsExpected(error)) { ShowError(error); LoadDesktopPreferences(); return Page(); }
-        return RedirectToPage();
+        return ReturnToSettings();
     }
 
     public IActionResult OnPostRemove()
     {
         _credentials.Delete(CredentialStore.SteamGridDb);
         TempData["Notice"] = "API key removed.";
-        return RedirectToPage();
+        return ReturnToSettings();
     }
 
     public async Task<IActionResult> OnPostCheckAsync()
     {
         var result = await _provider.CheckKeyAsync(HttpContext.RequestAborted);
         TempData["Notice"] = result == "ok" ? "SteamGridDB connection looks good." : result;
-        return RedirectToPage();
+        return ReturnToSettings();
     }
 }

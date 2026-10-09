@@ -9,8 +9,8 @@
 }
 <a class="back-link" asp-page="/Index">← Back to library</a>
 <header class="page-heading">
-    <div><p class="eyebrow">ACROSS YOUR LIBRARIES</p><h1>Global search<span class="heading-dot">.</span></h1>
-    <p class="lede">Search Games, Tools and Emulators together.</p></div>
+    <div><h1>Global search<span class="heading-dot">.</span></h1>
+    </div>
 </header>
 <div asp-validation-summary="All" class="validation" role="alert"></div>
 @if (!Model.HasQuery)
@@ -62,10 +62,6 @@ else
                             <a class="menu-item" asp-page="/Edit" asp-route-id="@entry.Id" role="menuitem" aria-label="Edit @entry.Title">
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                 Edit
-                            </a>
-                            <a class="menu-item" asp-page="/Artwork" asp-route-id="@entry.Id" role="menuitem" aria-label="Artwork for @entry.Title">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                                Art
                             </a>
                             @if (entry.Category == LibraryCategory.Games)
                             {
