@@ -11,6 +11,9 @@ public sealed class LibraryEntry
     public string TargetPath { get; set; } = "";
     public string TargetKey { get; set; } = "";
     public string? TrackingExecutablePath { get; set; }
+    // Legacy bundles put alphabetically sorted companions before the main entry.
+    public int LaunchPosition { get; set; } = int.MaxValue;
+    public int LaunchDelaySeconds { get; set; }
     public string Arguments { get; set; } = "";
     public string WorkingDirectory { get; set; } = "";
     public LibraryCategory Category { get; set; }
@@ -27,4 +30,8 @@ public sealed class LibraryEntry
 
 public sealed record EntryInput(Guid? Id, string Title, string TargetPath,
     string? Arguments, string? WorkingDirectory, LibraryCategory Category, bool IsFavorite,
-    IReadOnlyCollection<Guid> CompanionIds, string? TrackingExecutablePath = null);
+    IReadOnlyCollection<Guid> CompanionIds, string? TrackingExecutablePath = null,
+    IReadOnlyList<LaunchStepInput>? LaunchSteps = null);
+
+// Guid.Empty always identifies the main entry, including while editing.
+public sealed record LaunchStepInput(Guid EntryId, int DelaySeconds);

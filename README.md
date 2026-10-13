@@ -69,16 +69,30 @@ Share build errors or screenshots/behavior to iterate. Release publishing has be
 - Scans are bounded to 2,000 candidates, 100,000 visited entries, and two minutes. Select a smaller folder if a limit is reached. Results are temporary and expire after 30 minutes or application shutdown.
 - Titles are initially inferred from filenames; metadata matching is not implemented yet.
 
+## Library health
+
+**Settings → Library health** offers three separate, on-demand scans: artwork, tracking executables (Games only), and launch targets. Nothing scans at startup or changes/removes library entries automatically.
+
+- Artwork checks missing cover/background assignments and the launcher's managed copies; it does not contact providers or decode images.
+- Tracking checks explicit tracking paths or the direct launch `.exe` fallback. Shortcuts without a tracking target are flagged; ordinary direct executables do not need a separate override.
+- Launch targets checks saved `.exe`, `.lnk`, and `.url` file presence without executing anything or resolving shortcut destinations. It does not validate arguments or working directories.
+- Inaccessible/offline locations are reported as **Could not verify**, not confirmed missing. Reconnect drives before rescanning. Slow filesystem calls may take time.
+- Results include **Fix in editor** links. Each scan replaces the previous report; return and rescan after edits. Results are not persisted.
+
+Source-reviewed only; not built or exercised in the app.
+
 ## Bundled launch groups
 
 In **Edit entry → Bundled launch group**, select up to eight existing library entries to launch alongside that entry. For Eden + BetterJoy, add both to the library, edit Eden, select BetterJoy, and save. Eden's existing Play buttons (including featured and search results) use the bundle; launching BetterJoy independently does not launch Eden unless you explicitly configure that direction too.
 
-- Direct companions start in A–Z order, then the primary entry. Each uses its own saved arguments and working directory. Requests are sent back-to-back; the launcher does not wait for controller initialization or program readiness.
-- A companion `.exe` is skipped when its exact executable path can be confirmed as already running. Detection is best effort; shortcuts, bootstrap launchers, and processes Windows cannot inspect may start again.
+- The launch-order list includes the main entry. Drag a handle or use Up/Down to place helpers before or after it; Remove only unlinks that helper. Save the entry to apply changes. Existing bundles retain A–Z companions followed by main until reordered.
+- Each row can wait 0–10 seconds **before** its launch request, with at most 10 seconds of configured delays across the bundle. Delays do not establish program readiness. The total cap leaves headroom under the existing companion request timeout, but Windows process startup can still take longer.
+- A companion `.exe` and its delay are skipped when its exact executable path can be confirmed as already running. Detection is best effort; shortcuts, bootstrap launchers, and processes Windows cannot inspect may start again.
 - Companion bundles are not traversed, so circular links cannot cause recursive launches. No programs are automatically closed.
 - All launch files and working directories are checked before sending any launch requests. If Windows rejects a later request, remaining requests stop and the error identifies requests already sent. There is no process rollback.
 - Uncheck a companion and save to unlink it. Removing a library entry removes its incoming/outgoing bundle links, never its local files.
-- Bundle links are persisted by an additive EF migration on startup. Included in the successful Windows Release build; migration execution and bundled-launch behavior were not exercised by the assistant.
+- Request cancellation or host shutdown stops remaining delayed launch requests once observed, but does not undo launches already sent or interrupt a Windows process-start call in progress. A disconnected phone may not receive the partial-result summary.
+- Bundle order and delays use an additive EF migration on startup. This change is source-reviewed only: no build, migration, launch-order, drag/drop, or handheld runtime verification has been performed.
 
 ## Controller navigation
 

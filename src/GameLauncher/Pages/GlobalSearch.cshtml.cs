@@ -38,7 +38,7 @@ public sealed class GlobalSearchModel : UiPageModel
 
     public async Task<IActionResult> OnPostLaunchAsync(Guid id)
     {
-        try { TempData["Notice"] = await _library.LaunchAsync(id); }
+        try { TempData["Notice"] = await _library.LaunchAsync(id, HttpContext.RequestAborted); }
         catch (Exception error) when (IsExpected(error))
         {
             ShowError(error);

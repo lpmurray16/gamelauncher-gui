@@ -19,6 +19,8 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
         entry.Property(x => x.TargetPath).HasMaxLength(32767).IsRequired();
         entry.Property(x => x.TargetKey).HasMaxLength(32767).IsRequired();
         entry.Property(x => x.TrackingExecutablePath).HasMaxLength(32767);
+        entry.Property(x => x.LaunchPosition).HasDefaultValue(int.MaxValue).HasSentinel(int.MaxValue);
+        entry.Property(x => x.LaunchDelaySeconds).HasDefaultValue(0);
         entry.Property(x => x.Arguments).HasMaxLength(8192).IsRequired();
         entry.Property(x => x.WorkingDirectory).HasMaxLength(32767).IsRequired();
         entry.Property(x => x.CoverImageFile).HasMaxLength(512);
@@ -44,6 +46,8 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
         companion.ToTable("LaunchCompanions");
         companion.HasKey(x => new { x.EntryId, x.CompanionId });
         companion.HasIndex(x => x.CompanionId);
+        companion.Property(x => x.Position).HasDefaultValue(0);
+        companion.Property(x => x.DelaySeconds).HasDefaultValue(0);
         companion.HasOne<LibraryEntry>().WithMany().HasForeignKey(x => x.EntryId).OnDelete(DeleteBehavior.Cascade);
         companion.HasOne<LibraryEntry>().WithMany().HasForeignKey(x => x.CompanionId).OnDelete(DeleteBehavior.Cascade);
     }

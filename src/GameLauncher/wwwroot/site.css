@@ -198,6 +198,19 @@
 .launch-companion-option small{display:block;color:var(--muted);font-size:11px;overflow-wrap:anywhere}
 .launch-companion-option strong small{display:inline;margin-left:8px;font-weight:400}
 .launch-group .launch-group-note{font-size:12px}
+.launch-order{list-style:none;padding:0;margin:16px 0;display:grid;gap:10px;counter-reset:launch-step}
+.launch-step{counter-increment:launch-step;display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);scroll-margin-block:20px}
+.launch-step::before{content:counter(launch-step);color:var(--accent);font-weight:700}
+.launch-drag{cursor:grab;padding:10px 5px;color:var(--muted);font-size:24px;user-select:none}
+.launch-step.is-dragging{opacity:.5;border-color:var(--accent)}
+.launch-step-title{flex:1 1 140px;min-width:0;overflow-wrap:anywhere;font-size:14px}
+.launch-step-title small{display:block;color:var(--accent);font-size:12px;margin-top:4px}
+.launch-step-delay{display:grid;gap:6px;font-size:12px;color:var(--muted)}
+.launch-step-delay input{width:110px;max-width:100%}
+.launch-step-actions{display:flex;gap:6px;flex-wrap:wrap}
+.launch-step-actions .button{padding:10px;min-height:44px}
+.launch-step-actions [aria-disabled="true"]{opacity:.4}
+@media(max-width:600px){.launch-step-actions{width:100%;justify-content:flex-end}.launch-step-delay{flex-basis:100%}}
 
 /* Artwork editor */
 .artwork-preview{display:grid;grid-template-columns:200px minmax(0,1fr);gap:20px}

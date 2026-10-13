@@ -172,6 +172,7 @@ public sealed partial class EditModel
             Arguments = Entry.Arguments; WorkingDirectory = Entry.WorkingDirectory;
             TrackingExecutablePath = Entry.TrackingExecutablePath; IsFavorite = Entry.IsFavorite;
             CompanionIds = await _library.GetCompanionIdsAsync(Entry.Id);
+            await LoadLaunchStepsAsync(Entry.Id);
         }
         return await EditorPageAsync();
     }

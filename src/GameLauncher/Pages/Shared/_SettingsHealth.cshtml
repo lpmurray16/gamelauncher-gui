@@ -1,0 +1,72 @@
+@model SettingsModel
+@using GameLauncher.Services
+<section class="panel">
+    <h2>Library health</h2>
+    <p class="settings-status">Scans run only when requested. Nothing is changed or removed.</p>
+    <div class="actions">
+        <form method="post" asp-page="/Settings" asp-page-handler="ScanArtwork" asp-route-tab="health" asp-antiforgery="true" data-busy-form data-busy-label="Scanning artwork…">
+            <button type="submit" class="button secondary">Scan missing artwork</button>
+        </form>
+        <form method="post" asp-page="/Settings" asp-page-handler="ScanTracking" asp-route-tab="health" asp-antiforgery="true" data-busy-form data-busy-label="Scanning tracking…">
+            <button type="submit" class="button secondary">Scan tracking executables</button>
+        </form>
+        <form method="post" asp-page="/Settings" asp-page-handler="ScanLaunchTargets" asp-route-tab="health" asp-antiforgery="true" data-busy-form data-busy-label="Scanning launch targets…">
+            <button type="submit" class="button secondary">Scan missing launch targets</button>
+        </form>
+    </div>
+    <details class="settings-help">
+        <summary>What each scan checks</summary>
+        <div class="settings-help-copy">
+            <p><strong>Artwork:</strong> all entries with no cover/background assigned, invalid managed artwork references, or missing managed image files. This checks the launcher's copies, not the original imported images. It does not decode images or contact artwork providers.</p>
+            <p><strong>Tracking executables:</strong> Games only. Checks the saved tracking .exe using the status monitor's path rules, or the launch .exe when the optional tracking field is blank. A normal direct .exe does not need a separate tracking path. Shortcuts need the actual game's .exe for tracking. File presence does not prove that the correct game was selected or that its process can be observed.</p>
+            <p><strong>Launch targets:</strong> all entries' saved .exe, .lnk, and .url files. Checks file presence only; no file is executed, no shortcut destination is resolved or validated, and no URL destination is contacted. A present shortcut may still point to an unavailable game. Arguments and working directories are not checked.</p>
+            <p>Inaccessible or offline locations are reported as <strong>Could not verify</strong>, not confirmed missing. Reparse-point files and unavailable junctions are treated conservatively. Reconnect drives or restore access before rescanning. Slow or disconnected drives may take time to respond.</p>
+            <p>Each button runs only its own scan and replaces the previous results. Results are a point-in-time check, are not saved, and may change after editing. Use Fix in editor to review an entry, then return here and run the scan again.</p>
+        </div>
+    </details>
+</section>
+@if (Model.HealthReport is { } report)
+{
+    var scanLabel = report.Scan switch
+    {
+        LibraryHealthScan.Artwork => "Artwork",
+        LibraryHealthScan.Tracking => "Tracking executables",
+        _ => "Launch targets"
+    };
+    var uncertainCount = report.Entries.Count(entry => entry.Issues.Any(issue => issue.IsUncertain));
+    <section class="panel" aria-label="Library health results">
+        <h2>@scanLabel results</h2>
+        <p class="settings-status" role="status">Checked @report.CheckedEntries entries. @report.Entries.Count entries need review; @uncertainCount include a location that could not be verified.</p>
+        @if (report.CheckedEntries == 0)
+        {
+            <p class="notice">No @(report.Scan == LibraryHealthScan.Tracking ? "Games entries" : "library entries") to check.</p>
+        }
+        else if (report.Entries.Count == 0)
+        {
+            <p class="notice">No issues found by this scan. This is not a check that games can launch or be tracked successfully.</p>
+        }
+        @foreach (var entry in report.Entries)
+        {
+            <article class="panel">
+                <h3>@entry.Title <span class="optional">@entry.Category</span></h3>
+                <ul>
+                    @foreach (var issue in entry.Issues)
+                    {
+                        <li>
+                            @if (issue.IsUncertain)
+                            {
+                                <strong>Could not verify: </strong>
+                            }
+                            @issue.Message
+                        </li>
+                    }
+                </ul>
+                <a class="button secondary" asp-page="/Edit" asp-route-id="@entry.Id" asp-route-category="@entry.Category" aria-label="Fix @entry.Title in editor">Fix in editor</a>
+            </article>
+        }
+    </section>
+}
+else
+{
+    <p class="notice">Choose a scan to check your saved library. No health scan has run on this page.</p>
+}

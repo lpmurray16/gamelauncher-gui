@@ -32,7 +32,22 @@
                 }
             </fieldset>
         }
-        <p class="launch-group-note">Selected companions start first in A–Z order using their own saved settings, followed immediately by this entry. This does not wait for companions to finish initializing. Their own bundles are not followed, and nothing closes automatically.</p>
+        <h3>Launch order</h3>
+        <p>Drag a handle or use Up / Down. The main entry can go anywhere in the list. Changes take effect when you save the entry.</p>
+        <ol class="launch-order" data-launch-order>
+            @for (var i = 0; i < Model.LaunchSteps.Count; i++)
+            {
+                var step = Model.LaunchSteps[i];
+                var title = step.EntryId == Guid.Empty ? (string.IsNullOrWhiteSpace(Model.Title) ? "This entry" : Model.Title) : Model.CompanionChoices.FirstOrDefault(x => x.Id == step.EntryId)?.Title ?? "Unavailable entry";
+                <partial name="_LaunchStep" model="@(new EditModel.BundleRow(step.EntryId, title, step.DelaySeconds, i))" />
+            }
+        </ol>
+        @foreach (var companion in Model.CompanionChoices)
+        {
+            <template data-launch-template="@companion.Id"><partial name="_LaunchStep" model="@(new EditModel.BundleRow(companion.Id, companion.Title, 0, -1))" /></template>
+        }
+        <p class="launch-group-note" data-launch-order-status role="status" aria-live="polite"></p>
+        <p class="launch-group-note">Delays run before each launch request: 0–10 seconds per entry, up to 10 seconds total. An already-running companion skips its delay. A delay does not guarantee the program is ready. Bundles are not followed recursively, and nothing closes automatically.</p>
         <p class="launch-group-note">Companion .exe files are skipped when the same executable is already running. Detection is best effort: shortcuts and processes Windows cannot inspect may launch again. Uncheck companions to unlink them; removing an entry also removes its bundle links, never its files.</p>
     </details>
     <div class="form-footer"><a class="button secondary" asp-page="/Index" asp-route-category="@Model.Category">Back to library</a><button type="submit" class="button primary">@(Model.Id.HasValue ? "Save changes" : "Add to library") <span aria-hidden="true">↗</span></button></div>

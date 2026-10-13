@@ -1,0 +1,15 @@
+@model EditModel.BundleRow
+<li class="launch-step" data-launch-step="@Model.EntryId">
+    <span class="launch-drag" draggable="true" title="Drag to reorder" aria-hidden="true">⠿</span>
+    <input type="hidden" name="LaunchSteps[@Model.Index].EntryId" value="@Model.EntryId" data-step-id />
+    <strong class="launch-step-title">@Model.Title @if (Model.EntryId == Guid.Empty) { <small>Main entry</small> }</strong>
+    <label class="launch-step-delay">Wait before (seconds)<input type="number" name="LaunchSteps[@Model.Index].DelaySeconds" value="@Model.DelaySeconds" min="0" max="10" step="1" required data-step-delay /></label>
+    <div class="launch-step-actions">
+        <button type="button" class="button secondary" data-step-move="up" aria-label="Move @Model.Title up">↑ <span>Up</span></button>
+        <button type="button" class="button secondary" data-step-move="down" aria-label="Move @Model.Title down">↓ <span>Down</span></button>
+        @if (Model.EntryId != Guid.Empty)
+        {
+            <button type="button" class="button secondary" data-step-remove aria-label="Remove @Model.Title from bundle">Remove</button>
+        }
+    </div>
+</li>

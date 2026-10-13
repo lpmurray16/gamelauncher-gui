@@ -1,4 +1,94 @@
 "use strict";
+// Bundle ordering is local to the editor until its normal antiforgery Save POST.
+(() => {
+  const list = document.querySelector('[data-launch-order]');
+  if (!list) return;
+  const group = list.closest('.launch-group');
+  const boxes = Array.from(group.querySelectorAll('input[name="CompanionIds"]'));
+  const status = group.querySelector('[data-launch-order-status]');
+  let dragged = null;
+  const rows = () => Array.from(list.children);
+  const update = (message = '') => {
+    const items = rows();
+    items.forEach((row, index) => {
+      row.querySelector('[data-step-id]').name = `LaunchSteps[${index}].EntryId`;
+      row.querySelector('[data-step-delay]').name = `LaunchSteps[${index}].DelaySeconds`;
+      // Keep boundary buttons focusable so focus survives a move to either end.
+      row.querySelector('[data-step-move="up"]').setAttribute('aria-disabled', String(index === 0));
+      row.querySelector('[data-step-move="down"]').setAttribute('aria-disabled', String(index === items.length - 1));
+    });
+    const total = items.reduce((sum, row) => sum + Number(row.querySelector('[data-step-delay]').value || 0), 0);
+    items.forEach((row) => row.querySelector('[data-step-delay]').setCustomValidity(total > 10 ? 'Keep total bundle delays at 10 seconds or less.' : ''));
+    status.textContent = `${message}${message ? ' ' : ''}Total configured delay: ${total} seconds (maximum 10).`;
+  };
+  boxes.forEach((box) => box.addEventListener('change', () => {
+    const existing = rows().find((row) => row.dataset.launchStep === box.value);
+    if (!box.checked) existing?.remove();
+    else if (!existing) {
+      if (boxes.filter((item) => item.checked).length > 8) {
+        box.checked = false;
+        update('Choose no more than 8 companion entries.');
+        return;
+      }
+      const template = Array.from(group.querySelectorAll('template[data-launch-template]')).find((item) => item.dataset.launchTemplate === box.value);
+      if (template) {
+        const main = rows().find((row) => row.dataset.launchStep === '00000000-0000-0000-0000-000000000000');
+        list.insertBefore(template.content.cloneNode(true), main || null);
+      }
+    }
+    update('Launch order updated. Save the entry to apply it.');
+  }));
+  list.addEventListener('input', () => update());
+  list.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    const row = button?.closest('[data-launch-step]');
+    if (!row) return;
+    if (button.hasAttribute('data-step-remove')) {
+      const box = boxes.find((item) => item.value === row.dataset.launchStep);
+      const next = row.nextElementSibling || row.previousElementSibling;
+      if (box) box.checked = false;
+      row.remove();
+      (next?.querySelector('[data-step-move]') || box)?.focus();
+      update('Companion removed from this bundle.');
+      return;
+    }
+    const direction = button.dataset.stepMove;
+    if (!direction || button.getAttribute('aria-disabled') === 'true') return;
+    if (direction === 'up' && row.previousElementSibling) list.insertBefore(row, row.previousElementSibling);
+    if (direction === 'down' && row.nextElementSibling) list.insertBefore(row.nextElementSibling, row);
+    button.focus({ preventScroll: true });
+    row.scrollIntoView({ block: 'nearest' });
+    update(`Moved to position ${rows().indexOf(row) + 1}.`);
+  });
+  list.addEventListener('dragstart', (event) => {
+    const handle = event.target.closest('.launch-drag');
+    if (!handle) { event.preventDefault(); return; }
+    dragged = handle.closest('[data-launch-step]');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', dragged.dataset.launchStep);
+    dragged.classList.add('is-dragging');
+  });
+  list.addEventListener('dragover', (event) => {
+    if (!dragged) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  });
+  list.addEventListener('drop', (event) => {
+    if (!dragged) return;
+    event.preventDefault();
+    const target = event.target.closest('[data-launch-step]');
+    if (target && target !== dragged) {
+      const rect = target.getBoundingClientRect();
+      list.insertBefore(dragged, event.clientY < rect.top + rect.height / 2 ? target : target.nextSibling);
+    } else if (!target) list.append(dragged);
+    update(`Moved to position ${rows().indexOf(dragged) + 1}.`);
+  });
+  list.addEventListener('dragend', () => {
+    dragged?.classList.remove('is-dragging');
+    dragged = null;
+  });
+  update();
+})();
 // Settings navigation swaps existing panels so unsaved fields survive section changes.
 (() => {
   const nav = document.querySelector('[data-settings-nav]');

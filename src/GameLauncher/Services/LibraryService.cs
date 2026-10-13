@@ -7,11 +7,22 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GameLauncher.Services;
 
-public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, ScannerService scanner, GameStatusMonitor statusMonitor)
+public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, ScannerService scanner, GameStatusMonitor statusMonitor,
+    IHostApplicationLifetime? applicationLifetime = null)
 {
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly SemaphoreSlim _launchGate = new(1, 1);
     public const int MaxCompanions = 8;
+    public const int MaxStepDelaySeconds = 10;
+    public const int MaxTotalDelaySeconds = 10;
+
+    public async Task<List<LaunchStepInput>> GetLaunchStepsAsync(Guid entryId)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        var plan = await LoadLaunchPlanAsync(db, entryId);
+        return plan.Select(x => new LaunchStepInput(x.Entry.Id == entryId ? Guid.Empty : x.Entry.Id,
+            x.DelaySeconds)).ToList();
+    }
 
     public async Task<List<LibraryEntry>> GetCompanionChoicesAsync(Guid? entryId)
     {
@@ -90,13 +101,33 @@ public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, 
                 throw new ArgumentException($"Choose no more than {MaxCompanions} companion entries.");
             if (companionIds.Contains(entry.Id))
                 throw new ArgumentException("An entry cannot launch itself as a companion.");
-            if (await db.Entries.CountAsync(x => companionIds.Contains(x.Id)) != companionIds.Count)
+            var companions = await db.Entries.AsNoTracking().Where(x => companionIds.Contains(x.Id)).ToListAsync();
+            if (companions.Count != companionIds.Count)
                 throw new ArgumentException("A selected companion no longer exists. Review the launch group and save again.");
+            var steps = input.LaunchSteps?.ToList() ?? companions
+                .OrderBy(x => x.Title, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Id)
+                .Select(x => new LaunchStepInput(x.Id, 0)).Append(new LaunchStepInput(Guid.Empty, 0)).ToList();
+            ValidateLaunchSteps(steps, companionIds);
             var existingCompanions = await db.LaunchCompanions.Where(x => x.EntryId == entry.Id).ToListAsync();
             db.LaunchCompanions.RemoveRange(existingCompanions.Where(x => !companionIds.Contains(x.CompanionId)));
-            var existingIds = existingCompanions.Select(x => x.CompanionId).ToHashSet();
-            foreach (var companionId in companionIds.Where(x => !existingIds.Contains(x)))
-                db.LaunchCompanions.Add(new LaunchCompanion { EntryId = entry.Id, CompanionId = companionId });
+            for (var position = 0; position < steps.Count; position++)
+            {
+                var step = steps[position];
+                if (step.EntryId == Guid.Empty)
+                {
+                    entry.LaunchPosition = position;
+                    entry.LaunchDelaySeconds = step.DelaySeconds;
+                    continue;
+                }
+                var link = existingCompanions.SingleOrDefault(x => x.CompanionId == step.EntryId);
+                if (link is null)
+                {
+                    link = new LaunchCompanion { EntryId = entry.Id, CompanionId = step.EntryId };
+                    db.LaunchCompanions.Add(link);
+                }
+                link.Position = position;
+                link.DelaySeconds = step.DelaySeconds;
+            }
             entry.Title = title;
             entry.TargetPath = path;
             entry.TargetKey = key;
@@ -170,32 +201,25 @@ public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, 
         finally { _writeGate.Release(); }
     }
 
-    public async Task<string> LaunchAsync(Guid id)
+    public async Task<string> LaunchAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        if (!await _launchGate.WaitAsync(0))
+        using var launchCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,
+            applicationLifetime?.ApplicationStopping ?? CancellationToken.None);
+        cancellationToken = launchCancellation.Token;
+        if (!await _launchGate.WaitAsync(0, cancellationToken))
             throw new InvalidOperationException("Another launch request is still being sent. Please wait a moment.");
         try
         {
-            await using var db = await factory.CreateDbContextAsync();
-            var entry = await db.Entries.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id)
-                ?? throw new InvalidOperationException("This entry no longer exists.");
-            var companionIds = await db.LaunchCompanions.Where(x => x.EntryId == id)
-                .Select(x => x.CompanionId).ToListAsync();
-            if (companionIds.Count > MaxCompanions || companionIds.Contains(id))
-                throw new InvalidOperationException("This launch group is invalid. Edit the entry and save its companions again.");
-            var companions = await db.Entries.AsNoTracking().Where(x => companionIds.Contains(x.Id)).ToListAsync();
-            if (companions.Count != companionIds.Count)
-                throw new InvalidOperationException("A companion no longer exists. Review this entry's launch group.");
-
-            // Direct companions only; never recurse into their bundles, even if links form a cycle.
-            var entries = companions.OrderBy(x => x.Title, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(x => x.Id).Append(entry).ToList();
-            var plan = new List<(LibraryEntry Entry, ProcessStartInfo StartInfo)>();
+            await using var db = await factory.CreateDbContextAsync(cancellationToken);
+            var entries = await LoadLaunchPlanAsync(db, id, cancellationToken);
+            // Prepare every target before any request, including companions that may be running.
+            var plan = new List<(LibraryEntry Entry, int DelaySeconds, ProcessStartInfo StartInfo)>();
             foreach (var item in entries)
             {
-                try { plan.Add((item, PrepareLaunch(item))); }
+                cancellationToken.ThrowIfCancellationRequested();
+                try { plan.Add((item.Entry, item.DelaySeconds, PrepareLaunch(item.Entry))); }
                 catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
-                { throw new InvalidOperationException($"Cannot launch {item.Title}: {ex.Message} No launch requests were sent.", ex); }
+                { throw new InvalidOperationException($"Cannot launch {item.Entry.Title}: {ex.Message} No launch requests were sent.", ex); }
             }
 
             var started = new List<LibraryEntry>();
@@ -203,16 +227,32 @@ public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, 
             string? failure = null;
             foreach (var item in plan)
             {
-                if (item.Entry.Id != id && IsExecutableRunning(item.Entry.TargetPath))
-                {
-                    skipped.Add(item.Entry.Title);
-                    continue;
-                }
                 try
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (item.Entry.Id != id && IsExecutableRunning(item.Entry.TargetPath))
+                    {
+                        skipped.Add(item.Entry.Title);
+                        continue; // No delay for an already-running companion.
+                    }
+                    if (item.DelaySeconds > 0)
+                        await Task.Delay(TimeSpan.FromSeconds(item.DelaySeconds), cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    // A companion can become running while this step waits.
+                    if (item.Entry.Id != id && IsExecutableRunning(item.Entry.TargetPath))
+                    {
+                        skipped.Add(item.Entry.Title);
+                        continue;
+                    }
+                    cancellationToken.ThrowIfCancellationRequested();
                     using var process = Process.Start(item.StartInfo);
                     started.Add(item.Entry);
                     if (GameStatusMonitor.CanTrack(item.Entry)) statusMonitor.MarkStarting(item.Entry.Id);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    failure = "Launch canceled. Remaining launch requests were not sent.";
+                    break;
                 }
                 catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
                 {
@@ -242,6 +282,50 @@ public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, 
             return summary;
         }
         finally { _launchGate.Release(); }
+    }
+
+    private static void ValidateLaunchSteps(IReadOnlyList<LaunchStepInput> steps, IReadOnlyCollection<Guid> companionIds)
+    {
+        if (steps.Count != companionIds.Count + 1 || steps.Any(x => x is null)
+            || steps.Count(x => x.EntryId == Guid.Empty) != 1
+            || steps.Select(x => x.EntryId).Distinct().Count() != steps.Count
+            || steps.Any(x => x.EntryId != Guid.Empty && !companionIds.Contains(x.EntryId)))
+            throw new ArgumentException("Launch order must include the main entry and each selected companion exactly once, with no extra entries.");
+        if (steps.Any(x => x.DelaySeconds is < 0 or > MaxStepDelaySeconds))
+            throw new ArgumentException($"Each launch delay must be between 0 and {MaxStepDelaySeconds} seconds.");
+        if (steps.Sum(x => x.DelaySeconds) > MaxTotalDelaySeconds)
+            throw new ArgumentException($"Combined launch delays must not exceed {MaxTotalDelaySeconds} seconds.");
+    }
+
+    private static async Task<List<(LibraryEntry Entry, int DelaySeconds)>> LoadLaunchPlanAsync(
+        LibraryDbContext db, Guid id, CancellationToken cancellationToken = default)
+    {
+        var entry = await db.Entries.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new InvalidOperationException("This entry no longer exists.");
+        var links = await db.LaunchCompanions.AsNoTracking().Where(x => x.EntryId == id).ToListAsync(cancellationToken);
+        var companionIds = links.Select(x => x.CompanionId).ToList();
+        if (companionIds.Count > MaxCompanions || companionIds.Contains(id) || companionIds.Contains(Guid.Empty)
+            || entry.LaunchPosition < 0 || links.Any(x => x.Position < 0))
+            throw new InvalidOperationException("This launch group is invalid. Edit the entry and save its companions again.");
+        var companions = await db.Entries.AsNoTracking().Where(x => companionIds.Contains(x.Id)).ToListAsync(cancellationToken);
+        if (companions.Count != companionIds.Count)
+            throw new InvalidOperationException("A companion no longer exists. Review this entry's launch group.");
+
+        // Direct companions only. Equal legacy positions use the same in-memory title/ID order
+        // everywhere; never use comparer overloads in EF queries or recurse into nested bundles.
+        var byId = companions.ToDictionary(x => x.Id);
+        var ordered = links.Select(x => (Entry: byId[x.CompanionId], Position: x.Position, DelaySeconds: x.DelaySeconds))
+            .Append((Entry: entry, Position: entry.LaunchPosition, DelaySeconds: entry.LaunchDelaySeconds))
+            .OrderBy(x => x.Position).ThenBy(x => x.Entry.Title, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.Entry.Id).ToList();
+        try
+        {
+            ValidateLaunchSteps(ordered.Select(x => new LaunchStepInput(x.Entry.Id == id ? Guid.Empty : x.Entry.Id,
+                x.DelaySeconds)).ToList(), companionIds);
+        }
+        catch (ArgumentException ex)
+        { throw new InvalidOperationException($"This launch group is invalid: {ex.Message} Edit the entry and save again.", ex); }
+        return ordered.Select(x => (x.Entry, x.DelaySeconds)).ToList();
     }
 
     private static ProcessStartInfo PrepareLaunch(LibraryEntry entry)

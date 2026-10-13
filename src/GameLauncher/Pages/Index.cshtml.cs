@@ -87,7 +87,7 @@ public sealed class IndexModel : UiPageModel
     }
     public async Task<IActionResult> OnPostLaunchAsync(Guid id)
     {
-        try { TempData["Notice"] = await _library.LaunchAsync(id); }
+        try { TempData["Notice"] = await _library.LaunchAsync(id, HttpContext.RequestAborted); }
         catch (Exception error) when (IsExpected(error)) { ShowError(error); await LoadAsync(); return Page(); }
         return RedirectToPage(new { category = SafeCategory(Category), collectionId = CollectionId, search = Search, favorites = Favorites, sort = Sort });
     }

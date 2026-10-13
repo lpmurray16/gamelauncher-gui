@@ -34,13 +34,14 @@ public sealed partial class SettingsModel : UiPageModel
     [BindProperty(SupportsGet = true)] public string? Tab { get; set; }
     public string ActiveTab => Tab switch
     {
-        "startup" or "power" or "browser" or "companion" or "artwork" or "storage" or "about" => Tab,
+        "startup" or "power" or "browser" or "companion" or "artwork" or "health" or "storage" or "about" => Tab,
         _ => Request.Query["handler"].ToString() switch
         {
             "PowerMenu" => "power",
             "ChooseBrowser" or "ClearBrowser" or "LaunchBrowser" => "browser",
             "Save" or "Remove" or "Check" => "artwork",
             "OpenLocation" => "storage",
+            "ScanArtwork" or "ScanTracking" or "ScanLaunchTargets" => "health",
             _ => "startup"
         }
     };

@@ -12,6 +12,7 @@
         (Id: "browser", Label: "Browser"),
         (Id: "companion", Label: "Companion"),
         (Id: "artwork", Label: "Artwork"),
+        (Id: "health", Label: "Library health"),
         (Id: "storage", Label: "Local storage"),
         (Id: "about", Label: "About") })
     {
@@ -19,6 +20,10 @@
     }
 </nav>
 <div asp-validation-summary="All" class="validation" role="alert"></div>
+
+<div id="health" data-settings-panel="health" aria-label="Library health" hidden="@(Model.ActiveTab != "health")">
+    <partial name="_SettingsHealth" model="Model" />
+</div>
 
 <div id="companion" data-settings-panel="companion" aria-label="Android companion" hidden="@(Model.ActiveTab != "companion")">
     <partial name="_SettingsCompanion" model="Model" />

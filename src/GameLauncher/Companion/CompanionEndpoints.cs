@@ -132,7 +132,7 @@ public static class CompanionEndpoints
                 return Results.BadRequest(new CommandResponse("This command accepts only a saved game ID, with no request body."));
             var entry = await library.GetAsync(id);
             if (entry is null || entry.Category != LibraryCategory.Games) return Results.NotFound();
-            try { return Results.Ok(new CommandResponse(await library.LaunchAsync(id))); }
+            try { return Results.Ok(new CommandResponse(await library.LaunchAsync(id, context.RequestAborted))); }
             catch (InvalidOperationException)
             {
                 // Existing desktop errors may contain filesystem paths. Do not expose them on LAN.
