@@ -106,7 +106,7 @@ else
             <div class="card-body">
                 <a class="result-category" asp-page="/Index" asp-route-category="@entry.Category">@entry.Category</a>
                 <h2 title="@entry.Title">@entry.Title</h2>
-                <p class="last-played">@(entry.LastLaunchedUtc.HasValue ? "Last launched " + entry.LastLaunchedUtc.Value.ToLocalTime().ToString("MMM d · HH:mm") : "Not launched yet")</p>
+                <p class="last-played">@(entry.LastLaunchedUtc.HasValue ? "Last launched " + entry.LastLaunchedUtc.Value.ToLocalTime().ToString("MMM d · h:mm tt") : "Not launched yet")</p>
             </div>
         </article>
     }

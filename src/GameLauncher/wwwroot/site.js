@@ -241,20 +241,8 @@
   });
 })();
 // Window-only actions are allowlisted by the native host; preferences use POST forms.
-document.querySelector('[data-window-fullscreen]')?.addEventListener('click', () => {
-  window.chrome?.webview?.postMessage('window.fullscreen');
-});
 document.querySelector('[data-window-close]')?.addEventListener('click', () => {
   window.chrome?.webview?.postMessage('window.close');
-});
-window.chrome?.webview?.addEventListener('message', (event) => {
-  if (event.data?.type !== 'window') return;
-  const button = document.querySelector('[data-window-fullscreen]');
-  if (!button) return;
-  const label = event.data.fullscreen ? 'Exit fullscreen (F11)' : 'Enter fullscreen (F11)';
-  button.setAttribute('aria-label', label);
-  button.setAttribute('title', label);
-  button.setAttribute('aria-pressed', String(event.data.fullscreen));
 });
 document.querySelectorAll("[data-toast]").forEach((toast) => {
   window.setTimeout(() => toast.remove(), 3000);
