@@ -2,7 +2,7 @@
 
 A Windows-first, local-file game launcher built with **C# / .NET 10, Razor Pages, WinForms + WebView2, Entity Framework Core, and SQLite**.
 
-**Windows release: 1.7.0 · Android: 1.2 (release build complete; owner signing pending).** Windows Release publish and installer compilation succeeded; app/installer versions and SHA-256 were verified. The Windows installer is unsigned. Launchpad Companion 1.2 compiled successfully with versionCode 2, but its APK must be signed with the existing release key before installation/distribution. No apps were installed or launched. See [release notes](docs/releases/1.6.0.md).
+**Windows project version: 1.7.5 (build/installer verification pending) · Android: 1.2 (release build complete; owner signing pending).** The previous Windows 1.6.0 Release publish and installer compilation succeeded; app/installer versions and SHA-256 were verified for that release. The Windows installer is unsigned. Launchpad Companion 1.2 compiled successfully with versionCode 2, but its APK must be signed with the existing release key before installation/distribution. No apps were installed or launched. See [release notes](docs/releases/1.6.0.md).
 
 ## Features
 
@@ -21,6 +21,12 @@ A Windows-first, local-file game launcher built with **C# / .NET 10, Razor Pages
 Also included: SteamGridDB/local artwork, custom collections, global search, bundled launches, keyboard/controller navigation, fullscreen and optional Windows startup. The header browser shortcut saves a browser executable for this launcher only. Bundled launch options are collapsed by default in Add/Edit entry.
 
 Emulators currently means **emulator executables**, not ROM profiles. Metadata descriptions, saved scan roots, and ROM association remain future work. There is no sample library or fabricated artwork.
+
+## Artwork-first dashboard layout
+
+The library dashboard uses a compact featured-art strip with a normal-width Play button, tighter heading/filter spacing, and an entry count beside sorting rather than a separate row. Category search names its scope; global search remains separate. Portrait cards retain their selection outline and use a denser layout in short landscape windows. Touch-capable browsers expose card Play/Options without requiring hover, and favorite buttons have larger hit areas. The sidebar is replaced by horizontal Games / Emulators / Tools navigation in the shared top bar, with a separate labeled Settings link. All / Favorites / custom collection filters remain beside the library, not in category navigation; manage collections using the plus button there. Editor and Settings content and launch behavior are unchanged.
+
+This layout pass is source-reviewed only; no build or rendered/Ally verification has been performed. After rebuilding, check the first cover row, long titles, collection-menu overflow, touch actions, and controller focus on the actual handheld. Physical screen resolution is not necessarily the WebView's CSS viewport.
 
 ## Build and run — for the project owner
 
@@ -98,8 +104,10 @@ In **Edit entry → Bundled launch group**, select up to eight existing library 
 
 - D-pad / left stick: move selection; **A** activates, **B** goes back, **X** opens card options, **Y** toggles favorite.
 - **LB / RB:** move selection backward/forward by one-third of the current filtered/sorted entry list, rounded up. The count is recalculated per press, includes offscreen entries, and clamps at the first/last card. Scrolling is smooth; header controls are excluded. With no selected/remembered card, the first press selects the first entry.
-- **L2 / R2 (LT / RT):** previous/next category, cycling Games → Emulators → Tools and wrapping. Uses the sidebar's category navigation, only on dashboards—not Edit or Settings. Release the trigger before switching again.
-- **View / Back:** toggle sidebar focus. Keyboard equivalents include arrows, Enter, Esc, Shift+F10 and F1. Press A on a text field (or F2) to request the Windows keyboard; F11 toggles fullscreen.
+- **L2 / R2 (LT / RT):** previous/next category, cycling Games → Emulators → Tools and wrapping. Uses the top bar's category navigation, only on dashboards—not Edit or Settings. Release the trigger before switching again.
+- **Select / View / Back:** a quick tap toggles focus between top navigation and the previous content control (F1 does the same). Hold for roughly half a second to focus **global search**, retaining its text. The hold fires once, suppresses the tap action, and does not open the keyboard. Press A on the focused input (or F2) to request the Windows keyboard. Pending holds cancel on focus loss, controller disconnect, or keyboard/modal ownership; release controls before resuming. F11 toggles fullscreen.
+- Category tabs and collection filters remain separate. Existing library swipes change All / Favorites / collection filters; LT/RT changes categories only on dashboard pages.
+- Horizontal navigation and Select tap/hold are source-reviewed only; rendered handheld layout, controller timing and Windows-keyboard handoff still need owner verification.
 - Input requires foreground focus and a neutral/released controller after navigation or reconnect. A jump/category switch does not also activate a card in the same frame.
 
 ## Android companion and remote game stop

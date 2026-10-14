@@ -433,6 +433,9 @@ document.querySelectorAll(".browse-path").forEach((button) => {
   // Declared here: the keyboard message handler below resets it, and the gamepad
   // poll further down may never run when the browser exposes no gamepad API.
   let armed = false;
+  let selectStartedAt = null;
+  let selectHeld = false;
+  const resetSelect = () => { selectStartedAt = null; selectHeld = false; };
   const textField = (el) => el instanceof HTMLElement && !el.readOnly && !el.disabled &&
     el.matches('textarea, input[type="text"], input[type="search"], input[type="email"], input[type="password"], input[type="url"], input[type="tel"], input:not([type])');
   const keyboardNotice = (message) => {
@@ -458,6 +461,7 @@ document.querySelectorAll(".browse-path").forEach((button) => {
     if (data?.type !== 'keyboard') return;
     keyboardActive = data.state === 'requested' || data.state === 'shown';
     armed = false;
+    resetSelect();
     if (data.message) keyboardNotice(data.message);
     if (data.state === 'hidden' && keyboardTarget?.isConnected) {
       keyboardTarget.focus({ preventScroll: true });
@@ -479,14 +483,22 @@ document.querySelectorAll(".browse-path").forEach((button) => {
     scrollTarget.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
   };
   let contentFocus = null;
-  const toggleSidebar = () => {
-    if (document.activeElement.closest('.sidebar')) {
+  const toggleNavigation = () => {
+    if (keyboardActive || document.querySelector('dialog[open]')) return;
+    if (document.activeElement.closest('[data-primary-nav]')) {
       focus(contentFocus?.isConnected && visible(contentFocus) ? contentFocus : initial());
     } else {
       contentFocus = document.activeElement.matches(selector) ? document.activeElement : null;
       closeMenus();
-      focus(document.querySelector('.sidebar .nav-link.active') || document.querySelector('.sidebar .nav-link'));
+      focus(document.querySelector('[data-primary-nav] .nav-link.active') || document.querySelector('[data-primary-nav] .nav-link'));
     }
+  };
+  const focusGlobalSearch = () => {
+    if (keyboardActive || document.querySelector('dialog[open]')) return;
+    const search = document.getElementById('global-search');
+    if (!search || !visible(search)) return;
+    closeMenus();
+    focus(search); // Keep existing text; A/F2 opens the Windows keyboard deliberately.
   };
   // "Add to…" is an inline disclosure inside the card menu; its items are hidden until expanded.
   const setSubmenu = (trigger, open) => {
@@ -627,7 +639,7 @@ document.querySelectorAll(".browse-path").forEach((button) => {
     return !card || el.matches('.overlay-play button');
   });
   const initial = () => document.querySelector('.entry-card .overlay-play button') ||
-    candidates().find((el) => el.closest('main')) || candidates()[0];
+    candidates().find((el) => el.closest('main') && !el.closest('.app-topbar')) || candidates()[0];
   const jumpByThird = (forward) => {
     // Capture the card before closing a menu that might currently own focus.
     const activeCard = document.activeElement.closest('.entry-card');
@@ -752,7 +764,7 @@ document.querySelectorAll(".browse-path").forEach((button) => {
     if (keyboardActive) return;
     if (event.key === 'F1' && !event.altKey && !event.ctrlKey && !event.metaKey) {
       event.preventDefault();
-      if (!event.repeat) toggleSidebar();
+      if (!event.repeat) toggleNavigation();
       return;
     }
     if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
@@ -776,12 +788,12 @@ document.querySelectorAll(".browse-path").forEach((button) => {
   let padIndex = null;
   const poll = (now) => {
     window.requestAnimationFrame(poll);
-    if (keyboardActive || document.hidden || !document.hasFocus()) { armed = false; previous.clear(); heldDirection = null; return; }
+    if (keyboardActive || document.hidden || !document.hasFocus()) { armed = false; previous.clear(); heldDirection = null; resetSelect(); return; }
     let pad;
     try { pad = Array.from(navigator.getGamepads()).find((p) => p?.connected && p.mapping === 'standard'); }
-    catch { return; }
-    if (!pad) { armed = false; padIndex = null; return; }
-    if (padIndex !== pad.index) { armed = false; padIndex = pad.index; }
+    catch { armed = false; previous.clear(); heldDirection = null; resetSelect(); return; }
+    if (!pad) { armed = false; padIndex = null; previous.clear(); heldDirection = null; resetSelect(); return; }
+    if (padIndex !== pad.index) { armed = false; padIndex = pad.index; resetSelect(); }
     const pressed = new Set(pad.buttons.map((button, i) => button.pressed ? i : -1).filter((i) => i >= 0));
     const x = pad.axes[0] || 0;
     const y = pad.axes[1] || 0;
@@ -790,6 +802,7 @@ document.querySelectorAll(".browse-path").forEach((button) => {
       direction = Math.abs(x) > Math.abs(y) ? (x < 0 ? 'left' : 'right') : (y < 0 ? 'up' : 'down');
     // Require release after page loads, focus changes or reconnects: held A must not launch twice.
     if (!armed) {
+      resetSelect();
       armed = pressed.size === 0 && !direction;
       previous = pressed;
       heldDirection = null;
@@ -797,6 +810,7 @@ document.querySelectorAll(".browse-path").forEach((button) => {
     }
     // Modal input cannot navigate or activate the underlying library.
     if (document.querySelector('[data-confirm-dialog][open]')) {
+      resetSelect();
       if (pressed.has(1) && !previous.has(1)) back();
       else if (direction && (direction !== heldDirection || now >= nextMove)) {
         move(direction);
@@ -806,12 +820,37 @@ document.querySelectorAll(".browse-path").forEach((button) => {
       previous = pressed;
       return;
     }
+    // Select/View is exclusive: release for navigation, hold for global search.
+    // Do not combine a focus jump with A, triggers or stick movement on the same frame.
+    if (document.querySelector('dialog[open]')) { resetSelect(); previous = pressed; return; }
+    if (pressed.has(8)) {
+      if (!previous.has(8)) { selectStartedAt = now; selectHeld = false; }
+      if (selectStartedAt !== null && !selectHeld && now - selectStartedAt >= 550) {
+        selectHeld = true;
+        focusGlobalSearch();
+      }
+      heldDirection = null;
+      previous = pressed;
+      return;
+    }
+    if (previous.has(8)) {
+      // A slow frame can cross the threshold on release without observing it held.
+      const pending = selectStartedAt !== null && !selectHeld;
+      const longRelease = pending && now - selectStartedAt >= 550;
+      resetSelect();
+      if (longRelease) focusGlobalSearch();
+      else if (pending) toggleNavigation();
+      armed = false; // Require neutral after release, including any simultaneously held A.
+      heldDirection = null;
+      previous = pressed;
+      return;
+    }
     // Standard-mapped triggers: previous/next dashboard category, once per squeeze.
-    // Use actual sidebar links; never let triggers leave an editor/settings page.
+    // Use actual category links; never let triggers leave an editor/settings page.
     const categoryBack = pressed.has(6) && !previous.has(6);
     const categoryForward = pressed.has(7) && !previous.has(7);
     if ((categoryBack || categoryForward) && document.querySelector('[data-category-dashboard]')) {
-      const categories = Array.from(document.querySelectorAll('.sidebar a[data-category-nav]'));
+      const categories = Array.from(document.querySelectorAll('[data-primary-nav] a[data-category-nav]'));
       const index = categories.findIndex((link) => link.getAttribute('aria-current') === 'page');
       if (index >= 0) {
         closeMenus();
@@ -840,15 +879,16 @@ document.querySelectorAll(".browse-path").forEach((button) => {
       nextMove = now + (direction === heldDirection ? 150 : 350);
     }
     heldDirection = direction;
-    if (pressed.has(8) && !previous.has(8)) toggleSidebar();
-    else if (pressed.has(0) && !previous.has(0)) activate();
+    if (pressed.has(0) && !previous.has(0)) activate();
     else if (pressed.has(1) && !previous.has(1)) back();
     else if (pressed.has(2) && !previous.has(2)) openMenu();
     else if (pressed.has(3) && !previous.has(3)) document.activeElement.closest('.entry-card')?.querySelector('.favorite')?.click();
     previous = pressed;
   };
-  window.addEventListener('blur', () => { armed = false; });
-  document.addEventListener('visibilitychange', () => { armed = false; });
+  window.addEventListener('blur', () => { armed = false; resetSelect(); });
+  document.addEventListener('visibilitychange', () => { armed = false; resetSelect(); });
+  window.addEventListener('pagehide', () => { armed = false; resetSelect(); });
+  window.addEventListener('gamepaddisconnected', () => { armed = false; padIndex = null; resetSelect(); });
   window.requestAnimationFrame(poll);
 })();
 

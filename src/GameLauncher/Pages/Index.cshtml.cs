@@ -18,16 +18,8 @@ public sealed class IndexModel : UiPageModel
     [BindProperty(SupportsGet = true)] public string? Search { get; set; }
     [BindProperty(SupportsGet = true)] public bool Favorites { get; set; }
     [BindProperty(SupportsGet = true)] public string? Sort { get; set; } = "favorites";
-    public string SortLabel => Sort switch
-    {
-        "az" => "A–Z",
-        "za" => "Z–A",
-        "recent" => "LAST PLAYED · NEWEST FIRST",
-        _ => "FAVORITES FIRST · A–Z"
-    };
     public List<LibraryEntry> Entries { get; private set; } = new();
     public LibraryEntry? Featured { get; private set; }
-    public LibraryEntry? FallbackFeatured { get; private set; }
     public bool FeaturedIsFavorite { get; private set; }
     public int FavoriteCount { get; private set; }
     public int MatchingCount { get; private set; }
@@ -80,8 +72,6 @@ public sealed class IndexModel : UiPageModel
                 ?? Entries.FirstOrDefault(e => e.HeroImageFile is not null || e.CoverImageFile is not null)
                 ?? Entries.FirstOrDefault();
             FeaturedIsFavorite = Featured?.IsFavorite == true;
-            FallbackFeatured = Entries.FirstOrDefault(e => e.IsFavorite && e.Id != Featured?.Id)
-                ?? Entries.FirstOrDefault(e => e.Id != Featured?.Id);
         }
         catch (Exception error) when (IsExpected(error)) { ShowError(error); }
     }

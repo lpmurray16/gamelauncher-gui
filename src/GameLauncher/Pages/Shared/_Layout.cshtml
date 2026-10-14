@@ -19,31 +19,24 @@
     <link rel="stylesheet" href="/assets/site.css" />
     <script src="/assets/site.js" defer></script>
 </head>
-<body>
+<body class="@(ViewData["LibraryDashboard"] is true ? "library-dashboard" : null)">
 <a class="skip-link" href="#main">Skip to content</a>
 <div class="app-shell">
-    <aside class="sidebar">
-        <a class="brand" asp-page="/Index"><img class="brand-icon" src="/icon.ico" alt="" width="38" height="38" /><span>Launchpad<small>YOUR LOCAL LIBRARY</small></span></a>
-        <p class="nav-caption">WORKSPACE</p>
-        <nav aria-label="Main navigation">
-            @foreach (var category in new[] { LibraryCategory.Games, LibraryCategory.Emulators, LibraryCategory.Tools })
-            {
-                <a class="nav-link @(active == category.ToString() ? "active" : "")" data-category-nav
-                   asp-page="/Index"
-                   asp-route-category="@category"
-                   aria-current="@(active == category.ToString() ? "page" : null)">
-                    <span class="nav-icon" aria-hidden="true">@(category == LibraryCategory.Games ? "▦" : category == LibraryCategory.Emulators ? "◈" : "⌘")</span>
-                    @category
-                </a>
-            }
-            <a class="nav-link @(active == "Collections" ? "active" : "")" asp-page="/Collections" aria-current="@(active == "Collections" ? "page" : null)"><span class="nav-icon" aria-hidden="true">⚿</span>Collections</a>
-        </nav>
-        <div class="sidebar-footer">
-            <a class="nav-link @(active == "Settings" ? "active" : "")" asp-page="/Settings" aria-current="@(active == "Settings" ? "page" : null)"><span class="nav-icon" aria-hidden="true">⚙</span>Settings</a>
-        </div>
-    </aside>
     <main id="main" class="main" tabindex="-1">
-        <div class="topline">
+        <div class="topline app-topbar">
+            <a class="brand" asp-page="/Index" aria-label="Launchpad home"><img class="brand-icon" src="/icon.ico" alt="" width="32" height="32" /><span>Launchpad</span></a>
+            <nav class="primary-nav" data-primary-nav aria-label="Categories and settings">
+                @foreach (var category in new[] { LibraryCategory.Games, LibraryCategory.Emulators, LibraryCategory.Tools })
+                {
+                    <a class="nav-link @(active == category.ToString() ? "active" : "")" data-category-nav
+                       asp-page="/Index" asp-route-category="@category"
+                       aria-current="@(active == category.ToString() ? "page" : null)">@category</a>
+                }
+                <a class="nav-link settings-link @(active == "Settings" ? "active" : "")" asp-page="/Settings" aria-current="@(active == "Settings" ? "page" : null)">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831 2.34 2.34 0 0 1 2.33-4.033 2.34 2.34 0 0 0 3.32-1.915" /><circle cx="12" cy="12" r="3" /></svg>
+                    Settings
+                </a>
+            </nav>
             <div class="header-shortcuts">
                 @if (browserError is not null)
                 {
@@ -68,7 +61,7 @@
             </div>
             <form method="get" asp-page="/GlobalSearch" class="global-search" role="search" aria-label="Search all libraries">
                 <label class="sr-only" for="global-search">Search Games, Tools and Emulators</label>
-                <input id="global-search" type="search" name="q" value="@(ViewData["GlobalQuery"] as string)" placeholder="Search all libraries…" maxlength="200" />
+                <input id="global-search" type="search" name="q" value="@(ViewData["GlobalQuery"] as string)" placeholder="Search everything…" maxlength="200" />
                 <button type="submit" aria-label="Search all libraries">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.9-3.9" /></svg>
                 </button>
@@ -116,7 +109,7 @@
             </div>
         </section>
         @RenderBody()
-        <p class="navigation-hint">Navigate: arrows / D-pad · Select: Enter / A · Options: Shift+F10 / X · Back: Esc / B · Sidebar: F1 / View · Jump ⅓ back / forward: LB / RB · Category: L2 / R2 (LT / RT) · Favorite: Y (controller) · Windows keyboard: A on a text field / F2 · Fullscreen: F11</p>
+        <p class="navigation-hint">Navigate: arrows / D-pad · Select: Enter / A · Options: Shift+F10 / X · Back: Esc / B · Navigation: F1 / tap Select (View/Back) · Global search: hold Select · Jump ⅓ back / forward: LB / RB · Category: L2 / R2 (LT / RT) · Favorite: Y (controller) · Windows keyboard: A on a text field / F2 · Fullscreen: F11</p>
         <footer class="page-footer">Less searching. More playing.<span>GAME LAUNCHER / LOCAL LIBRARY</span></footer>
     </main>
 </div>
