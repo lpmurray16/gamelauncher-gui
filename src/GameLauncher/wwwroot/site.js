@@ -244,6 +244,14 @@
 document.querySelector('[data-window-close]')?.addEventListener('click', () => {
   window.chrome?.webview?.postMessage('window.close');
 });
+// Publish the sticky header's live height so scrolled-to content never lands beneath it.
+(() => {
+  const topbar = document.querySelector('.app-topbar');
+  if (!topbar || !window.ResizeObserver) return;
+  new ResizeObserver(() => {
+    document.documentElement.style.setProperty('--topbar-height', `${topbar.offsetHeight}px`);
+  }).observe(topbar);
+})();
 document.querySelectorAll("[data-toast]").forEach((toast) => {
   window.setTimeout(() => toast.remove(), 3000);
 });
@@ -686,8 +694,13 @@ document.querySelectorAll(".browse-path").forEach((button) => {
     const from = bounds(active);
     const horizontal = direction === 'left' || direction === 'right';
     const sign = direction === 'left' || direction === 'up' ? -1 : 1;
+    // The sticky header stays geometrically close while content scrolls beneath it, so content
+    // only enters the header when nothing else lies in that direction (or via F1 / Select).
+    const fromContent = !active.closest('.app-topbar');
     let best = null;
     let bestScore = Infinity;
+    let bestHeader = null;
+    let bestHeaderScore = Infinity;
     for (const el of candidates()) {
       if (el === active || (active.closest('.entry-card') && el.closest('.entry-card') === active.closest('.entry-card'))) continue;
       const to = bounds(el);
@@ -698,9 +711,11 @@ document.querySelectorAll(".browse-path").forEach((button) => {
       const gap = horizontal ? Math.max(0, from.top - to.bottom, to.top - from.bottom)
         : Math.max(0, from.left - to.right, to.left - from.right);
       const score = forward + Math.abs(horizontal ? dy : dx) * 2 + gap * 5;
-      if (score < bestScore) { best = el; bestScore = score; }
+      if (fromContent && el.closest('.app-topbar')) {
+        if (score < bestHeaderScore) { bestHeader = el; bestHeaderScore = score; }
+      } else if (score < bestScore) { best = el; bestScore = score; }
     }
-    focus(best);
+    focus(best || bestHeader);
   };
   const activate = () => {
     const active = document.activeElement;
