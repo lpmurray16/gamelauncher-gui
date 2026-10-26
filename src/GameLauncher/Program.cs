@@ -188,14 +188,18 @@ internal static class Program
             await context.Response.WriteAsync("<!doctype html><html><body><h1>That action could not be completed.</h1>" +
                 "<p>Your game files have not been removed. Return to the library and try again.</p><a href='/'>Back to library</a></body></html>");
         }));
-        app.MapGet("/assets/site.css", () => EmbeddedAsset("site.css", "text/css; charset=utf-8"));
-        app.MapGet("/assets/site.js", () => EmbeddedAsset("site.js", "text/javascript; charset=utf-8"));
-        app.MapGet("/icon.ico", () => EmbeddedAsset("icon.ico", "image/x-icon"));
-        app.MapGet("/artwork/image/{fileName}", (string fileName, AppPaths artworkPaths) =>
+        app.MapGet("/assets/site.css", (HttpContext context) => EmbeddedAsset(context, "site.css", "text/css; charset=utf-8"));
+        app.MapGet("/assets/site.js", (HttpContext context) => EmbeddedAsset(context, "site.js", "text/javascript; charset=utf-8"));
+        app.MapGet("/icon.ico", (HttpContext context) => EmbeddedAsset(context, "icon.ico", "image/x-icon"));
+        app.MapGet("/artwork/image/{fileName}", (string fileName, AppPaths artworkPaths, HttpContext context) =>
         {
             try
             {
                 var (fullPath, contentType) = Services.Artwork.Resolve(artworkPaths, fileName);
+                // Managed artwork receives a new filename on replacement. Cache only successful
+                // desktop asset responses, privately and separately for each shell session.
+                context.Response.Headers["Cache-Control"] = "private, max-age=86400";
+                context.Response.Headers["Vary"] = "X-Launcher-Session";
                 return Results.File(fullPath, contentType);
             }
             catch (Exception) { return TypedResults.NotFound(); }
@@ -220,10 +224,19 @@ internal static class Program
         return app;
     }
 
-    private static IResult EmbeddedAsset(string name, string contentType)
+    private static IResult EmbeddedAsset(HttpContext context, string name, string contentType)
     {
-        var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("GameLauncher." + name);
-        return stream is null ? Results.NotFound() : Results.Stream(stream, contentType);
+        var assembly = Assembly.GetExecutingAssembly();
+        var stream = assembly.GetManifestResourceStream("GameLauncher." + name);
+        if (stream is null) return Results.NotFound();
+        // The build's module ID also versions the layout URLs, including local builds where
+        // the product version is unchanged. Unversioned/mismatched URLs remain no-store.
+        if (context.Request.Query["v"] == assembly.ManifestModule.ModuleVersionId.ToString("N"))
+        {
+            context.Response.Headers["Cache-Control"] = "private, max-age=31536000, immutable";
+            context.Response.Headers["Vary"] = "X-Launcher-Session";
+        }
+        return Results.Stream(stream, contentType);
     }
 
     internal static void TryLog(AppPaths? paths, Exception exception)

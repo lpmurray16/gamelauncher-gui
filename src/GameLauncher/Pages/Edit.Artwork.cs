@@ -92,12 +92,16 @@ public sealed partial class EditModel
             }
             await LoadArtworkAsync();
             ArtworkNotice = kind == ArtworkKind.Cover ? "Cover artwork applied." : "Background artwork applied.";
-            // Re-fetch both types so results stay visible
-            var coversTask = _provider.CoversAsync(providerGameId, HttpContext.RequestAborted);
-            var heroesTask = _provider.HeroesAsync(providerGameId, HttpContext.RequestAborted);
-            await Task.WhenAll(coversTask, heroesTask);
-            CoverOptions = coversTask.Result;
-            HeroOptions = heroesTask.Result;
+            // The enhanced UI retains its existing result nodes and loaded thumbnails.
+            // Only a full-page POST needs to retrieve the options again.
+            if (Request.Headers["X-Entry-Artwork"] != "true")
+            {
+                var coversTask = _provider.CoversAsync(providerGameId, HttpContext.RequestAborted);
+                var heroesTask = _provider.HeroesAsync(providerGameId, HttpContext.RequestAborted);
+                await Task.WhenAll(coversTask, heroesTask);
+                CoverOptions = coversTask.Result;
+                HeroOptions = heroesTask.Result;
+            }
             SelectedGameId = providerGameId;
             SelectedGameTitle = providerTitle?.Trim();
         }

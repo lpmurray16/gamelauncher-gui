@@ -44,7 +44,8 @@ public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, 
         var entries = await db.Entries.AsNoTracking().Where(x => x.Category == category).ToListAsync();
         if (!string.IsNullOrWhiteSpace(search))
             entries = entries.Where(x => x.Title.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
-        return entries.OrderByDescending(x => x.IsFavorite).ThenBy(x => x.Title, StringComparer.OrdinalIgnoreCase).ToList();
+        // The dashboard owns filtering and ordering; do not sort the same entries twice.
+        return entries;
     }
 
     public async Task<List<LibraryEntry>> SearchAllAsync(string term)

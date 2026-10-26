@@ -151,13 +151,20 @@
       const documentFragment = new DOMParser().parseFromString(await response.text(), 'text/html');
       const updated = documentFragment.querySelector('#entry-artwork');
       if (!updated) throw new Error('The artwork response could not be displayed.');
+      // Keep the live option nodes (and their loaded thumbnails) after an enhanced download.
+      // Ordinary POST responses still render their own complete provider results.
+      const providerResults = form.matches('.option-card') ? region.querySelector('[data-artwork-provider]') : null;
+      if (providerResults) updated.querySelector('[data-artwork-provider]')?.replaceWith(providerResults);
       region.replaceWith(updated);
       updated.querySelectorAll('details').forEach((item, index) => {
         if (collapsed[index] !== undefined) item.open = !collapsed[index];
       });
       const sameAction = Array.from(updated.querySelectorAll('form')).find((item) => item.action === form.action);
-      const focus = sameAction ? updated.querySelectorAll('button')[focusIndex] :
-        updated.querySelector('input:not([type="hidden"]), .match-row button, .artwork-section summary');
+      // Preserved download buttons are still locked until finally; unlock before restoring focus.
+      lockedButtons.forEach((button) => { button.disabled = false; });
+      const focus = providerResults?.contains(event.submitter) ? event.submitter :
+        sameAction ? updated.querySelectorAll('button')[focusIndex] :
+          updated.querySelector('input:not([type="hidden"]), .match-row button, .artwork-section summary');
       (focus || updated).focus({ preventScroll: true });
       window.scrollTo({ top: scrollY, behavior: 'instant' });
     } catch (error) {
@@ -301,25 +308,33 @@ document.querySelectorAll("[data-toast]").forEach((toast) => {
 (() => {
   const banner = document.querySelector('[data-power-banner]');
   if (!banner) return;
+  // These controls are fixed for the lifetime of the page (Settings only hides panels).
+  const bannerText = banner.querySelector('[data-power-banner-text]');
+  const messages = document.querySelectorAll('[data-power-message]');
+  const countdowns = document.querySelectorAll('[data-power-countdown]');
+  const startButtons = document.querySelectorAll('[data-power-start], [data-power-local]');
+  const cancelButtons = document.querySelectorAll('[data-power-cancel]');
+  const set = (el, property, value) => {
+    if (el[property] !== value) el[property] = value;
+  };
   const poll = async () => {
     try {
       const response = await fetch('/Power?handler=Status', { cache: 'no-store', signal: AbortSignal.timeout(4000) });
       if (!response.ok) throw new Error('Power status unavailable');
       const state = await response.json();
       const countdown = state.pending ? `Shutdown in approximately ${state.remainingSeconds} seconds.` : '';
-      banner.hidden = !state.pending;
-      banner.querySelector('[data-power-banner-text]').textContent = countdown + ' Save your work. Apps will not be forced closed.';
-      document.querySelectorAll('[data-power-message]').forEach((el) => { el.textContent = state.message; });
-      document.querySelectorAll('[data-power-countdown]').forEach((el) => { el.textContent = countdown; });
-      document.querySelectorAll('[data-power-start], [data-power-local]').forEach((el) => { el.disabled = state.pending || state.dispatching; });
-      document.querySelectorAll('[data-power-cancel]').forEach((el) => { el.disabled = !state.pending; });
+      set(banner, 'hidden', !state.pending);
+      set(bannerText, 'textContent', countdown + ' Save your work. Apps will not be forced closed.');
+      messages.forEach((el) => set(el, 'textContent', state.message));
+      countdowns.forEach((el) => set(el, 'textContent', countdown));
+      startButtons.forEach((el) => set(el, 'disabled', state.pending || state.dispatching));
+      cancelButtons.forEach((el) => set(el, 'disabled', !state.pending));
     } catch {
       // A disconnected window is not evidence that the machine powered off or cancellation succeeded.
-      document.querySelectorAll('[data-power-message]').forEach((el) => {
-        el.textContent = 'Power status unavailable. A previous countdown may still be active; cancellation is not confirmed.';
-      });
-      if (!banner.hidden) banner.querySelector('[data-power-banner-text]').textContent = 'Shutdown status unavailable. The countdown may still be active.';
-      document.querySelectorAll('[data-power-start], [data-power-local]').forEach((el) => { el.disabled = true; });
+      messages.forEach((el) => set(el, 'textContent',
+        'Power status unavailable. A previous countdown may still be active; cancellation is not confirmed.'));
+      if (!banner.hidden) set(bannerText, 'textContent', 'Shutdown status unavailable. The countdown may still be active.');
+      startButtons.forEach((el) => set(el, 'disabled', true));
     } finally { window.setTimeout(poll, 1000); }
   };
   poll();
@@ -629,10 +644,11 @@ document.querySelectorAll(".browse-path").forEach((button) => {
     window.addEventListener('pagehide', () => { cancel(); touches.clear(); });
   })();
   const candidates = () => Array.from(document.querySelectorAll(selector)).filter((el) => {
-    if (!visible(el) || el.classList.contains('skip-link')) return false;
+    if (el.classList.contains('skip-link')) return false;
     const card = el.closest('.entry-card');
-    // One directional stop per game. Tab still reaches every card control.
-    return !card || el.matches('.overlay-play button');
+    // Exclude non-stops before style/layout reads; Tab still reaches every card control.
+    if (card && !el.matches('.overlay-play button')) return false;
+    return visible(el);
   });
   const initial = () => document.querySelector('.entry-card .overlay-play button') ||
     candidates().find((el) => el.closest('main') && !el.closest('.app-topbar')) || candidates()[0];
@@ -701,8 +717,9 @@ document.querySelectorAll(".browse-path").forEach((button) => {
     let bestScore = Infinity;
     let bestHeader = null;
     let bestHeaderScore = Infinity;
+    const activeCard = active.closest('.entry-card');
     for (const el of candidates()) {
-      if (el === active || (active.closest('.entry-card') && el.closest('.entry-card') === active.closest('.entry-card'))) continue;
+      if (el === active || (activeCard && el.closest('.entry-card') === activeCard)) continue;
       const to = bounds(el);
       const dx = (to.left + to.right - from.left - from.right) / 2;
       const dy = (to.top + to.bottom - from.top - from.bottom) / 2;

@@ -3,6 +3,7 @@
 @{
     var active = ViewData["Section"] as string ?? "Games";
     var powerStatus = Power.Status();
+    var assetVersion = typeof(GameLauncher.Services.LibraryService).Assembly.ManifestModule.ModuleVersionId.ToString("N");
     var hasBrowser = false;
     string? browserError = null;
     try { hasBrowser = !string.IsNullOrWhiteSpace(Browser.ExecutablePath); }
@@ -15,9 +16,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@ViewData["Title"] · Launchpad</title>
-    <link rel="icon" href="/icon.ico" />
-    <link rel="stylesheet" href="/assets/site.css" />
-    <script src="/assets/site.js" defer></script>
+    <link rel="icon" href="/icon.ico?v=@assetVersion" />
+    <link rel="stylesheet" href="/assets/site.css?v=@assetVersion" />
+    <script src="/assets/site.js?v=@assetVersion" defer></script>
 </head>
 <body class="@(ViewData["LibraryDashboard"] is true ? "library-dashboard" : null)">
 <a class="skip-link" href="#main">Skip to content</a>
