@@ -9,12 +9,13 @@ public sealed partial class SettingsModel : UiPageModel
     private readonly CredentialStore _credentials;
     private readonly SteamGridDbClient _provider;
     private readonly DesktopPreferences _desktop;
+    private readonly ThemePreferences _themes;
     private readonly BrowserLauncher _browser;
     private readonly FolderPicker _picker;
     private readonly PcPowerService _power;
     private readonly GameLauncher.Companion.CompanionAccess _companion;
-    public SettingsModel(AppPaths paths, CredentialStore credentials, SteamGridDbClient provider, DesktopPreferences desktop, BrowserLauncher browser, FolderPicker picker, PcPowerService power, GameLauncher.Companion.CompanionAccess companion)
-    { _paths = paths; _credentials = credentials; _provider = provider; _desktop = desktop; _browser = browser; _picker = picker; _power = power; _companion = companion; }
+    public SettingsModel(AppPaths paths, CredentialStore credentials, SteamGridDbClient provider, DesktopPreferences desktop, BrowserLauncher browser, FolderPicker picker, PcPowerService power, GameLauncher.Companion.CompanionAccess companion, ThemePreferences themes)
+    { _paths = paths; _credentials = credentials; _provider = provider; _desktop = desktop; _browser = browser; _picker = picker; _power = power; _companion = companion; _themes = themes; }
 
     public string? BrowserExecutable { get; private set; }
 
@@ -34,9 +35,10 @@ public sealed partial class SettingsModel : UiPageModel
     [BindProperty(SupportsGet = true)] public string? Tab { get; set; }
     public string ActiveTab => Tab switch
     {
-        "startup" or "power" or "browser" or "companion" or "artwork" or "health" or "storage" or "about" => Tab,
+        "startup" or "appearance" or "power" or "browser" or "companion" or "artwork" or "health" or "storage" or "about" => Tab,
         _ => Request.Query["handler"].ToString() switch
         {
+            "Appearance" => "appearance",
             "PowerMenu" => "power",
             "ChooseBrowser" or "ClearBrowser" or "LaunchBrowser" => "browser",
             "Save" or "Remove" or "Check" => "artwork",

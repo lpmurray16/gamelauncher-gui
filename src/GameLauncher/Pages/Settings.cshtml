@@ -8,6 +8,7 @@
 <nav class="settings-nav" aria-label="Settings sections" data-settings-nav>
     @foreach (var item in new[] {
         (Id: "startup", Label: "Startup & display"),
+        (Id: "appearance", Label: "Appearance"),
         (Id: "power", Label: "PC power"),
         (Id: "browser", Label: "Browser"),
         (Id: "companion", Label: "Companion"),
@@ -20,6 +21,10 @@
     }
 </nav>
 <div asp-validation-summary="All" class="validation" role="alert"></div>
+
+<section class="panel" id="appearance" data-settings-panel="appearance" aria-label="Appearance" hidden="@(Model.ActiveTab != "appearance")">
+    <partial name="_SettingsAppearance" model="Model" />
+</section>
 
 <div id="health" data-settings-panel="health" aria-label="Library health" hidden="@(Model.ActiveTab != "health")">
     <partial name="_SettingsHealth" model="Model" />

@@ -37,7 +37,7 @@ public sealed class CompanionAccess : IDisposable
     public string? ListenerError { get { lock (_gate) return _listenerError; } }
     public bool IsActive { get { lock (_gate) return _enabled && _listeningPort.HasValue; } }
     public DeviceInfoDto Device => new(DeviceId, Environment.MachineName,
-        typeof(CompanionAccess).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "1.7.5");
+        typeof(CompanionAccess).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "102926.1139");
 
     public CompanionAccess(AppPaths paths)
     {

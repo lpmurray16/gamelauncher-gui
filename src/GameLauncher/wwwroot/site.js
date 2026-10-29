@@ -1,4 +1,114 @@
 "use strict";
+// Decorative placeholders never replace controls or claim measurable progress.
+function createSkeletonLoader(layout = 'rows') {
+  const loader = document.createElement('div');
+  loader.className = `skeleton-loader skeleton-${layout}`;
+  loader.setAttribute('aria-hidden', 'true');
+  const count = layout === 'cards' ? 4 : layout === 'rows' ? 3 : 1;
+  for (let index = 0; index < count; index++) {
+    const item = document.createElement('div');
+    item.className = 'skeleton-item';
+    loader.append(item);
+  }
+  return loader;
+}
+function initializeImageLoaders(root = document) {
+  root.querySelectorAll('img[src^="/artwork/"]').forEach((image) => {
+    if (image.dataset.loaderReady) return;
+    image.dataset.loaderReady = 'true';
+    const settle = () => {
+      image.classList.remove('image-loading');
+      image.removeEventListener('load', settle);
+      image.removeEventListener('error', settle);
+    };
+    image.addEventListener('load', settle);
+    image.addEventListener('error', settle);
+    if (image.complete) settle();
+    else image.classList.add('image-loading');
+  });
+}
+initializeImageLoaders();
+// Theme preview uses CSSOM properties (allowed by our CSP), not inline CSS text.
+(() => {
+  const form = document.querySelector('[data-theme-editor]');
+  if (!form) return;
+  const root = document.documentElement;
+  const colors = Array.from(form.querySelectorAll('[data-theme-value]'));
+  const radii = Array.from(form.querySelectorAll('[data-theme-radius]'));
+  const status = form.querySelector('[data-theme-status]');
+  const warning = form.querySelector('[data-theme-contrast]');
+  const validColor = (value) => /^#[0-9a-f]{6}$/i.test(value);
+  const channels = (hex) => [1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16));
+  const luminance = (hex) => channels(hex).reduce((total, channel, index) => {
+    const value = channel / 255;
+    const linear = value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
+    return total + linear * [.2126, .7152, .0722][index];
+  }, 0);
+  const contrast = (left, right) => {
+    const a = luminance(left), b = luminance(right);
+    return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+  };
+  const mix = (from, to, amount) => {
+    const target = channels(to);
+    return '#' + channels(from).map((value, index) => Math.round(value * (1 - amount) + target[index] * amount).toString(16).padStart(2, '0')).join('');
+  };
+  const update = (preview = true) => {
+    const palette = {};
+    let valid = true;
+    colors.forEach((input) => {
+      const value = input.value.toLowerCase();
+      const okay = validColor(value);
+      input.setCustomValidity(okay ? '' : 'Enter a six-digit hex color, such as #ff8a47.');
+      if (!okay) { valid = false; return; }
+      palette[input.dataset.themeValue] = value;
+      form.querySelector(`[data-theme-picker="${input.dataset.themeValue}"]`).value = value;
+    });
+    radii.forEach((input) => {
+      form.querySelector(`[data-theme-radius-output="${input.dataset.themeRadius}"]`).textContent = `${input.value} px`;
+    });
+    if (!valid) {
+      warning.hidden = true;
+      status.textContent = 'Complete each hex color to preview or save. Your saved theme is unchanged.';
+      return;
+    }
+    const onAccent = luminance(palette.Accent) > .179 ? '#16110e' : '#ffffff';
+    if (preview) {
+      colors.forEach((input) => root.style.setProperty(input.dataset.themeVariable, palette[input.dataset.themeValue]));
+      radii.forEach((input) => root.style.setProperty(input.dataset.themeRadius, `${input.value}px`));
+      // Keep derived palette rules identical to ThemePreferences.GetCss.
+      root.style.setProperty('--accent-hover', palette.Accent === '#ff8a47' ? '#ffa46e' : mix(palette.Accent, '#ffffff', .2));
+      root.style.setProperty('--accent-soft', palette.Accent === '#ff8a47' && palette.Background === '#101113' ? '#302219' : mix(palette.Background, palette.Accent, .16));
+      root.style.setProperty('--on-accent', onAccent);
+      root.style.setProperty('color-scheme', luminance(palette.Background) > .179 ? 'light' : 'dark');
+    }
+    const lowContrast = [palette.Background, palette.Surface, palette.Raised, palette.Header]
+      .some((background) => contrast(palette.Text, background) < 4.5 || contrast(palette.Muted, background) < 4.5) ||
+      contrast(onAccent, palette.Accent) < 4.5;
+    warning.hidden = !lowContrast;
+    warning.textContent = lowContrast ? 'Some text/background combinations have low contrast. Consider adjusting them for readability. You can still save this theme.' : '';
+    const changed = [...colors, ...radii].some((input) => input.value.toLowerCase() !== input.dataset.saved.toLowerCase());
+    status.textContent = changed ? 'Unsaved appearance changes. Select Save theme to keep them.' : 'No unsaved appearance changes.';
+  };
+  colors.forEach((input) => {
+    input.addEventListener('input', () => update());
+    form.querySelector(`[data-theme-picker="${input.dataset.themeValue}"]`).addEventListener('input', (event) => {
+      input.value = event.target.value;
+      update();
+    });
+  });
+  radii.forEach((input) => input.addEventListener('input', () => update()));
+  const restore = (source) => {
+    [...colors, ...radii].forEach((input) => { input.value = input.dataset[source]; });
+    update();
+  };
+  form.querySelector('[data-theme-discard]').addEventListener('click', () => restore('saved'));
+  form.querySelector('[data-theme-defaults]').addEventListener('click', () => {
+    restore('default');
+    status.textContent = 'Default appearance previewed. Select Save theme to keep it, or Discard changes to return.';
+  });
+  // Restore attempted values after a failed save only when Appearance is visible.
+  update(!form.closest('[data-settings-panel]').hidden);
+})();
 // Bundle ordering is local to the editor until its normal antiforgery Save POST.
 (() => {
   const list = document.querySelector('[data-launch-order]');
@@ -140,6 +250,10 @@
     message.setAttribute('role', 'status');
     message.textContent = form.dataset.busyLabel || 'Updating artwork…';
     region.prepend(message);
+    const layout = form.matches('.match-row') ? 'cards' :
+      form.matches('.option-card') ? (form.dataset.kind === 'Hero' ? 'banner' : 'cover') : 'rows';
+    const loader = createSkeletonLoader(layout);
+    message.after(loader);
     region.setAttribute('aria-busy', 'true');
     lockedButtons.forEach((button) => { button.disabled = true; });
     try {
@@ -156,6 +270,7 @@
       const providerResults = form.matches('.option-card') ? region.querySelector('[data-artwork-provider]') : null;
       if (providerResults) updated.querySelector('[data-artwork-provider]')?.replaceWith(providerResults);
       region.replaceWith(updated);
+      initializeImageLoaders(updated);
       updated.querySelectorAll('details').forEach((item, index) => {
         if (collapsed[index] !== undefined) item.open = !collapsed[index];
       });
@@ -172,6 +287,7 @@
       message.textContent = `${error.message} Your entry edits are still here. If applying artwork, check the preview before retrying; the change may already have been saved.`;
     } finally {
       pending = false;
+      loader.remove();
       region.removeAttribute('aria-busy');
       lockedButtons.forEach((button) => { button.disabled = false; });
     }
@@ -366,7 +482,9 @@ document.querySelectorAll("[data-scan-form]").forEach((form) => {
     form.dataset.submitting = "true";
     form.setAttribute("aria-busy", "true");
     if (!browsing) {
-      form.querySelector(".scan-progress").hidden = false;
+      const progress = form.querySelector(".scan-progress");
+      progress.hidden = false;
+      progress.after(createSkeletonLoader());
       form.querySelector("[data-scan-button]").textContent = "Scanning…";
     } else {
       event.submitter.textContent = "Choosing folder…";

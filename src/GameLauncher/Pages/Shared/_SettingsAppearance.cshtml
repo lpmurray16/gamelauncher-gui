@@ -1,0 +1,59 @@
+@model SettingsModel
+@{
+    var saved = Model.SavedTheme;
+}
+<h2>Appearance</h2>
+@if (Model.ThemeLoadWarning is string warning)
+{
+    <p class="notice warning" role="alert">@warning</p>
+}
+<details class="settings-help">
+    <summary>About themes and live preview</summary>
+    <div class="settings-help-copy">
+        <p>Adjust colors and corners to preview Launchpad immediately. Save theme keeps your choices for every page and the next launch. Leaving this page without saving discards the preview.</p>
+        <p>Discard changes returns to your saved theme. Restore defaults previews the built-in colors and corners; select Save theme to keep them. Status colors, artwork overlays, circular icons, and Windows dialogs keep their own styling.</p>
+        <p>Appearance is stored in appearance.json in Launchpad's local data folder. This editor does not change the Android companion.</p>
+    </div>
+</details>
+<form method="post" asp-page="/Settings" asp-route-tab="appearance" asp-page-handler="Appearance" data-theme-editor data-busy-form data-busy-label="Saving theme…">
+    <div class="theme-color-grid">
+    @foreach (var color in GameLauncher.Services.ThemePreferences.ColorFields)
+    {
+        var inputId = "theme-" + color.Key;
+        <div class="field">
+            <label for="@inputId">@color.Label</label>
+            <div class="theme-color-input">
+                <input type="color" value="@saved.Colors[color.Key]" data-theme-picker="@color.Key" aria-label="@($"Pick {color.Label.ToLowerInvariant()}")" />
+                <input asp-for="Theme.Colors[color.Key]" id="@inputId" type="text" required pattern="#[0-9a-fA-F]{6}" maxlength="7" spellcheck="false" autocomplete="off"
+                       data-theme-value="@color.Key" data-theme-variable="@color.CssVariable" data-default="@color.DefaultValue" data-saved="@saved.Colors[color.Key]" />
+            </div>
+        </div>
+    }
+    </div>
+    <div class="theme-radius-grid">
+        <div class="field">
+            <label for="theme-panel-radius">Card and panel corners <output for="theme-panel-radius" data-theme-radius-output="--radius">@Model.Theme.PanelRadius px</output></label>
+            <input asp-for="Theme.PanelRadius" id="theme-panel-radius" type="range" min="0" max="32" step="1" data-theme-radius="--radius" data-default="14" data-saved="@saved.PanelRadius" />
+        </div>
+        <div class="field">
+            <label for="theme-control-radius">Button and input corners <output for="theme-control-radius" data-theme-radius-output="--control-radius">@Model.Theme.ControlRadius px</output></label>
+            <input asp-for="Theme.ControlRadius" id="theme-control-radius" type="range" min="0" max="24" step="1" data-theme-radius="--control-radius" data-default="8" data-saved="@saved.ControlRadius" />
+        </div>
+    </div>
+    <p class="notice warning" data-theme-contrast role="status" hidden></p>
+    <section class="theme-preview panel" aria-label="Theme preview">
+        <h3>Live preview</h3>
+        <div class="theme-preview-card">
+            <strong>Your library, your style</strong>
+            <p>Primary text on a card surface.</p>
+            <small>Secondary text and borders follow your palette.</small>
+            <div class="actions"><button type="button" class="button primary">Primary button</button><button type="button" class="button secondary">Secondary button</button></div>
+        </div>
+    </section>
+    <div class="theme-actions actions">
+        <button type="submit" class="button primary">Save theme</button>
+        <button type="button" class="button secondary" data-theme-discard>Discard changes</button>
+        <button type="button" class="button secondary" data-theme-defaults>Restore defaults</button>
+    </div>
+    <p data-theme-status role="status" aria-live="polite">Preview changes before saving.</p>
+</form>

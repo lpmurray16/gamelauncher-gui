@@ -36,11 +36,12 @@
 @if (Model.Result is not null)
 {
     <section class="panel results-panel"><div class="panel-heading"><span class="step-number">02</span><div><h2>Review discoveries <span class="count-pill">@Model.Result.Candidates.Count</span></h2><p>Select trusted executables and shortcuts to add to @Model.Category. Helpers and uninstallers may also appear. Shortcuts can run programs with their own arguments; only select files you trust.</p></div></div>
+    @if (Model.Result.AlreadyAddedCount > 0) { <p role="status">Already in your library: @Model.Result.AlreadyAddedCount launch file(s) hidden from these results.</p> }
     @if (Model.Result.Truncated) { <div class="notice warning" role="status">The scan reached its safety limit. Results may be incomplete; scan a smaller folder for more targeted results.</div> }
     @if (Model.Result.Warnings.Count > 0) { <details class="scan-warnings"><summary>Scan notes (@Model.Result.Warnings.Count)</summary><ul>@foreach (var warning in Model.Result.Warnings) { <li>@warning</li> }</ul></details> }
     @if (Model.Result.Candidates.Count == 0)
     {
-        <div class="inline-empty"><h3>No launch files found</h3><p>Choose another folder or include subfolders and scan again.</p></div>
+        <div class="inline-empty"><h3>No new launch files found</h3><p>Choose another folder or include subfolders and scan again.</p></div>
     }
     else
     {

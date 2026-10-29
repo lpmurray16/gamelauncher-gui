@@ -1,6 +1,9 @@
 ; Build with scripts/Build-Installer.ps1. Keep AppId stable across upgrades.
 #ifndef AppVersion
-  #define AppVersion "1.7.7"
+  #define AppVersion "102926.1139"
+#endif
+#ifndef AppNumericVersion
+  #define AppNumericVersion "2026.1029.1139.0"
 #endif
 #define AppName "Launchpad"
 #define PublishDir SourcePath + "..\artifacts\publish\win-x64"
@@ -10,7 +13,10 @@ AppId={{E69C9705-E0BD-4ED3-BA0A-E1DA82C85466}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
-VersionInfoVersion={#AppVersion}
+VersionInfoVersion={#AppNumericVersion}
+VersionInfoProductVersion={#AppNumericVersion}
+VersionInfoTextVersion={#AppVersion}
+VersionInfoProductTextVersion={#AppVersion}
 DefaultDirName={localappdata}\Programs\GameLauncher
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes

@@ -116,6 +116,7 @@ internal static class Program
         builder.Services.AddSingleton<ScannerService>();
         builder.Services.AddSingleton<FolderPicker>();
         builder.Services.AddSingleton<DesktopPreferences>();
+        builder.Services.AddSingleton<ThemePreferences>();
         builder.Services.AddSingleton<BrowserLauncher>();
         builder.Services.AddSingleton<LibraryService>();
         builder.Services.AddSingleton<CollectionService>();
@@ -189,6 +190,8 @@ internal static class Program
                 "<p>Your game files have not been removed. Return to the library and try again.</p><a href='/'>Back to library</a></body></html>");
         }));
         app.MapGet("/assets/site.css", (HttpContext context) => EmbeddedAsset(context, "site.css", "text/css; charset=utf-8"));
+        // Render-blocking, authenticated stylesheet; saved appearance is never cached stale.
+        app.MapGet("/assets/theme.css", (ThemePreferences theme) => Results.Text(theme.GetCss(), "text/css; charset=utf-8"));
         app.MapGet("/assets/site.js", (HttpContext context) => EmbeddedAsset(context, "site.js", "text/javascript; charset=utf-8"));
         app.MapGet("/icon.ico", (HttpContext context) => EmbeddedAsset(context, "icon.ico", "image/x-icon"));
         app.MapGet("/artwork/image/{fileName}", (string fileName, AppPaths artworkPaths, HttpContext context) =>

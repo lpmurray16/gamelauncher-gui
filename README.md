@@ -2,7 +2,7 @@
 
 A Windows-first, local-file game launcher built with **C# / .NET 10, Razor Pages, WinForms + WebView2, Entity Framework Core, and SQLite**.
 
-**Windows project version: 1.7.7 (build/installer verification pending) · Android: 1.2 (release build complete; owner signing pending).** The previous Windows 1.6.0 Release publish and installer compilation succeeded; app/installer versions and SHA-256 were verified for that release. The Windows installer is unsigned. Launchpad Companion 1.2 compiled successfully with versionCode 2, but its APK must be signed with the existing release key before installation/distribution. No apps were installed or launched. See [release notes](docs/releases/1.6.0.md).
+**Windows release version: 102926.1139 (build/installer verification pending) · Android: 1.2 (release build complete; owner signing pending).** The previous Windows 1.6.0 Release publish and installer compilation succeeded; app/installer versions and SHA-256 were verified for that release. The Windows installer is unsigned. Launchpad Companion 1.2 compiled successfully with versionCode 2, but its APK must be signed with the existing release key before installation/distribution. No apps were installed or launched. See [release notes](docs/releases/1.6.0.md).
 
 ## Features
 
@@ -204,7 +204,7 @@ Prerequisites: .NET 10 SDK and Inno Setup 6 (the first successful build used 6.7
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1
 ```
 
-The script discovers Inno Setup in standard locations (or accepts `-IsccPath`), cleans only the generated x64 publish directory, publishes Release, verifies the Microsoft signature on the cached/downloaded WebView2 bootstrapper, collects dependency notices, compiles Setup, and writes SHA-256. The project `<Version>` drives the installer version. Build output and prerequisites stay under ignored `artifacts/`.
+The script discovers Inno Setup in standard locations (or accepts `-IsccPath`), cleans only the generated x64 publish directory, publishes Release, verifies the Microsoft signature on the cached/downloaded WebView2 bootstrapper, collects dependency notices, compiles Setup, and writes SHA-256. Versioning is automatic: the script captures local time once at startup in **`MMddyy.HHmm`** format (two-digit year, 24-hour time). There is no version prompt or override. That timestamp becomes the public product version and installer/checksum filename. Compatible Windows numeric metadata uses `yyyy.MMdd.HHmm.0` (numeric components omit leading zeros); a temporary manifest carries the same numeric version. Tracked project/version files are not rewritten. Builds started in the same minute share a version and output filename; the later build replaces those generated artifacts. Build output, temporary build inputs, and prerequisites stay under ignored `artifacts/`.
 
 ### Release verification boundary
 

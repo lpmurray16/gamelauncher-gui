@@ -7,9 +7,12 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>GameLauncher</RootNamespace>
     <AssemblyName>GameLauncher</AssemblyName>
-    <Version>1.7.7</Version>
-    <AssemblyVersion>1.7.7.0</AssemblyVersion>
-    <FileVersion>1.7.7.0</FileVersion>
+    <!-- Public release label: MMddyy.HHmm (set per build by scripts/Build-Installer.ps1). Numeric metadata: yyyy.MMdd.HHmm.0. -->
+    <Version>2026.1029.1139</Version>
+    <InformationalVersion>102926.1139</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <AssemblyVersion>2026.1029.1139.0</AssemblyVersion>
+    <FileVersion>2026.1029.1139.0</FileVersion>
     <Product>Launchpad</Product>
     <Description>A local game, emulator, and tool launcher for Windows.</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>

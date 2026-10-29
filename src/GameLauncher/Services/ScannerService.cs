@@ -1,14 +1,16 @@
 using System.Collections.Concurrent;
 using System.IO;
 using System.Text.RegularExpressions;
+using GameLauncher.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace GameLauncher.Services;
 
 public sealed record ScanCandidate(Guid Id, string Title, string TargetPath, string WorkingDirectory);
 public sealed record ScanResult(Guid Id, string Root, IReadOnlyList<ScanCandidate> Candidates,
-    IReadOnlyList<string> Warnings, bool Truncated);
+    IReadOnlyList<string> Warnings, bool Truncated, int AlreadyAddedCount);
 
-public sealed class ScannerService
+public sealed class ScannerService(IDbContextFactory<LibraryDbContext> factory)
 {
     private const int MaxCandidates = 2000;
     private const int MaxVisited = 100000;
@@ -39,7 +41,13 @@ public sealed class ScannerService
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromMinutes(2));
             ScanResult result;
-            try { result = await Task.Run(() => Scan(root, recursive, timeout.Token), timeout.Token); }
+            try
+            {
+                await using var db = await factory.CreateDbContextAsync(timeout.Token);
+                var existing = (await db.Entries.Select(x => x.TargetKey).ToListAsync(timeout.Token))
+                    .ToHashSet(StringComparer.Ordinal);
+                result = await Task.Run(() => Scan(root, recursive, existing, timeout.Token), timeout.Token);
+            }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             { throw new InvalidOperationException("The scan took too long. Please choose a smaller folder."); }
             Prune();
@@ -58,13 +66,14 @@ public sealed class ScannerService
             _results.TryRemove(item.Key, out _);
     }
 
-    private static ScanResult Scan(string root, bool recursive, CancellationToken cancellationToken)
+    private static ScanResult Scan(string root, bool recursive, HashSet<string> existing, CancellationToken cancellationToken)
     {
         var candidates = new List<ScanCandidate>();
         var warnings = new List<string>();
         var folders = new Stack<string>();
         folders.Push(root);
         int visited = 0;
+        int alreadyAdded = 0;
         bool truncated = false;
         void Warn(string value) { if (warnings.Count < 30) warnings.Add(value); }
 
@@ -92,6 +101,11 @@ public sealed class ScannerService
                         var name = Path.GetFileNameWithoutExtension(path);
                         if (Noise.Any(x => name.StartsWith(x, StringComparison.OrdinalIgnoreCase))) continue;
                         var normalized = LaunchTarget.Normalize(path);
+                        if (existing.Contains(normalized.ToUpperInvariant()))
+                        {
+                            alreadyAdded++;
+                            continue;
+                        }
                         var title = Regex.Replace(name.Replace('_', ' ').Replace('-', ' '), @"\s+", " ").Trim();
                         if (title.Length == 0) title = "Untitled";
                         if (title.Length > 200) title = title[..200];
@@ -106,6 +120,6 @@ public sealed class ScannerService
             { Warn($"Could not read {folder}: {ex.Message}"); }
         }
         if (truncated) Warn("Scan limit reached. Import these results, then scan a smaller subfolder for remaining files.");
-        return new(Guid.NewGuid(), root, candidates.OrderBy(x => x.Title, StringComparer.OrdinalIgnoreCase).ToList(), warnings, truncated);
+        return new(Guid.NewGuid(), root, candidates.OrderBy(x => x.Title, StringComparer.OrdinalIgnoreCase).ToList(), warnings, truncated, alreadyAdded);
     }
 }
