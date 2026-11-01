@@ -75,12 +75,35 @@ public sealed class IndexModel : UiPageModel
         }
         catch (Exception error) when (IsExpected(error)) { ShowError(error); }
     }
+    [BindProperty] public List<Guid> SelectedEntryIds { get; set; } = new();
+    public async Task<IActionResult> OnPostBulkAddAsync(Guid targetCollectionId)
+    {
+        try
+        {
+            var result = await _collections.AddEntriesAsync(targetCollectionId, SelectedEntryIds);
+            TempData["Notice"] = $"Added {result.Added} games; skipped {result.AlreadyPresent} already in the collection and {result.Unavailable} unavailable/non-game entries.";
+        }
+        catch (Exception error) when (IsExpected(error)) { ShowError(error); await LoadAsync(); return Page(); }
+        return RedirectToPage(new { category = SafeCategory(Category), collectionId = CollectionId, search = Search, favorites = Favorites, sort = Sort });
+    }
+
     public async Task<IActionResult> OnPostLaunchAsync(Guid id)
     {
         try { TempData["Notice"] = await _library.LaunchAsync(id, HttpContext.RequestAborted); }
         catch (Exception error) when (IsExpected(error)) { ShowError(error); await LoadAsync(); return Page(); }
         return RedirectToPage(new { category = SafeCategory(Category), collectionId = CollectionId, search = Search, favorites = Favorites, sort = Sort });
     }
+    public async Task<IActionResult> OnPostOpenContainingFolderAsync(Guid id)
+    {
+        try
+        {
+            await _library.OpenContainingFolderAsync(id);
+            TempData["Notice"] = "Containing folder requested in File Explorer.";
+        }
+        catch (Exception error) when (IsExpected(error)) { ShowError(error); await LoadAsync(); return Page(); }
+        return RedirectToPage(new { category = SafeCategory(Category), collectionId = CollectionId, search = Search, favorites = Favorites, sort = Sort });
+    }
+
     public async Task<IActionResult> OnPostFavoriteAsync(Guid id)
     {
         try

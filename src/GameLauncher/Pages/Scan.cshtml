@@ -7,6 +7,32 @@
 <a class="back-link" asp-page="/Index" asp-route-category="@Model.Category">← Back to @Model.Category</a>
 <header class="page-heading"><div><h1>Discover local entries<span class="heading-dot">.</span></h1></div></header>
 <div asp-validation-summary="All" class="validation" role="alert"></div>
+<section class="panel">
+    <h2>Saved locations</h2>
+    <p>Scan a saved folder for new launch files, then review what to import into @Model.Category. Existing entries are hidden; nothing is imported or deleted automatically.</p>
+    @if (Model.LocationsWarning is not null) { <p class="notice warning" role="alert">@Model.LocationsWarning</p> }
+    @if (Model.SavedLocations.Count == 0) { <p>No saved locations yet. Choose a folder below and select Save location.</p> }
+    <div class="scan-folder-grid">
+    @foreach (var location in Model.SavedLocations)
+    {
+        <div class="panel">
+            <p class="saved-location-path">@location.FolderPath</p>
+            <p>@(location.Recursive ? "Includes subfolders" : "This folder only")</p>
+            <form method="post" asp-page-handler="ScanLocation" data-busy-form data-busy-label="Scanning…">
+                <input type="hidden" name="Category" value="@Model.Category" />
+                <input type="hidden" name="locationId" value="@location.Id" />
+                <button type="submit" class="button primary">Scan for changes</button>
+            </form>
+            <form method="post" asp-page-handler="RemoveLocation" data-busy-form data-busy-label="Removing…">
+                <input type="hidden" name="Category" value="@Model.Category" />
+                <input type="hidden" name="locationId" value="@location.Id" />
+                <button type="submit" class="button secondary">Remove saved location</button>
+            </form>
+        </div>
+    }
+    </div>
+    <details><summary>How saved locations work</summary><p>Locations are shared across Games, Emulators, and Tools. Scans are manual and look for files not already in your library, not modifications to existing entries. To change a location’s subfolder preference, save the same path again below. Removing a location only removes the bookmark. Use Settings → Library health to check missing launch files.</p></details>
+</section>
 <section class="panel"><div class="panel-heading"><span class="step-number">01</span><div><h2>Choose a folder</h2><p>Find .exe files, Windows .lnk shortcuts, and supported Steam .url shortcuts. Nothing is launched or imported automatically.</p></div></div>
 <form method="post" asp-page-handler="Scan" data-scan-form>
     <input asp-for="Category" type="hidden" />
@@ -30,7 +56,7 @@
         <span class="sr-only" role="status" aria-live="polite" data-folder-selection-status></span>
     </div>
     <div class="field"><label asp-for="Root">Folder path</label><div class="input-action"><input asp-for="Root" spellcheck="false" placeholder="C:\Games" /><button type="submit" class="button secondary" asp-page-handler="Browse" formnovalidate data-browse>Browse folders</button></div><small>The folder picker opens a native Windows dialog.</small></div>
-    <div class="scan-options"><label class="check-label"><input asp-for="Recursive" /> Include subfolders</label><button type="submit" class="button primary" data-scan-button>Scan folder <span aria-hidden="true">↗</span></button></div>
+    <div class="scan-options"><label class="check-label"><input asp-for="Recursive" /> Include subfolders</label><button type="submit" class="button secondary" asp-page-handler="SaveLocation" data-save-location>Save location</button><button type="submit" class="button primary" data-scan-button>Scan folder <span aria-hidden="true">↗</span></button></div>
     <div class="scan-progress" role="status" aria-live="polite" hidden><span class="spinner" aria-hidden="true"></span><div><strong>Scanning your folder…</strong><p>Looking for local launch files. Large folders may take a moment.</p></div></div>
 </form></section>
 @if (Model.Result is not null)

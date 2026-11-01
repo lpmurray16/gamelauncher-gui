@@ -455,6 +455,49 @@ document.querySelectorAll("[data-toast]").forEach((toast) => {
   };
   poll();
 })();
+// Bulk checkboxes belong to a separate form, never nested inside card action forms.
+document.querySelectorAll('[data-bulk-form]').forEach((form) => {
+  const boxes = Array.from(document.querySelectorAll('[data-bulk-entry]')).filter(box => box.form === form);
+  const submit = form.querySelector('[data-bulk-submit]');
+  const toggle = Array.from(document.querySelectorAll('[data-bulk-toggle]')).find(button => button.form === form);
+  const controls = form.querySelector('[data-bulk-controls]');
+  let selecting = boxes.some(box => box.checked);
+  const setSelectionMode = (active) => {
+    selecting = active;
+    controls.hidden = !active;
+    form.classList.toggle('bulk-collapsed', !active);
+    toggle.textContent = active ? 'Done selecting' : 'Select entries';
+    toggle.setAttribute('aria-expanded', String(active));
+    boxes.forEach(box => {
+      box.closest('.bulk-entry-select').hidden = !active;
+      if (!active) box.checked = false;
+    });
+    update();
+  };
+  const update = () => {
+    const count = boxes.filter(box => box.checked).length;
+    form.querySelector('[data-bulk-count]').textContent = `${count} selected${count > 500 ? ' — maximum 500' : ''}`;
+    submit.disabled = count === 0 || count > 500;
+    boxes.forEach(box => box.closest('.entry-card').classList.toggle('bulk-selected', box.checked));
+  };
+  boxes.forEach(box => box.addEventListener('change', update));
+  form.querySelector('[data-bulk-all]').addEventListener('click', () => { boxes.forEach(box => { box.checked = true; }); update(); });
+  form.querySelector('[data-bulk-clear]').addEventListener('click', () => { boxes.forEach(box => { box.checked = false; }); update(); });
+  form.addEventListener('submit', event => {
+    const count = boxes.filter(box => box.checked).length;
+    if (!count || count > 500 || form.dataset.submitting === 'true') { event.preventDefault(); return; }
+    form.dataset.submitting = 'true';
+    form.setAttribute('aria-busy', 'true');
+    submit.textContent = 'Adding…';
+    window.setTimeout(() => { submit.disabled = true; }, 0);
+  });
+  toggle.hidden = false;
+  toggle.addEventListener('click', () => {
+    if (form.dataset.submitting !== 'true') setSelectionMode(!selecting);
+  });
+  setSelectionMode(selecting);
+});
+
 // Standard POST forms own scanning mutations and antiforgery tokens.
 document.querySelectorAll("[data-scan-form]").forEach((form) => {
   const root = form.querySelector('input[name="Root"]');
@@ -479,9 +522,12 @@ document.querySelectorAll("[data-scan-form]").forEach((form) => {
   form.addEventListener("submit", (event) => {
     if (form.dataset.submitting === "true") { event.preventDefault(); return; }
     const browsing = event.submitter?.hasAttribute("data-browse");
+    const saving = event.submitter?.hasAttribute("data-save-location");
     form.dataset.submitting = "true";
     form.setAttribute("aria-busy", "true");
-    if (!browsing) {
+    if (saving) {
+      event.submitter.textContent = "Saving…";
+    } else if (!browsing) {
       const progress = form.querySelector(".scan-progress");
       progress.hidden = false;
       progress.after(createSkeletonLoader());
@@ -765,7 +811,7 @@ document.querySelectorAll(".browse-path").forEach((button) => {
     if (el.classList.contains('skip-link')) return false;
     const card = el.closest('.entry-card');
     // Exclude non-stops before style/layout reads; Tab still reaches every card control.
-    if (card && !el.matches('.overlay-play button')) return false;
+    if (card && !el.matches('.overlay-play button, [data-bulk-entry]')) return false;
     return visible(el);
   });
   const initial = () => document.querySelector('.entry-card .overlay-play button') ||

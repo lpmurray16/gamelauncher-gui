@@ -20,7 +20,15 @@ A Windows-first, local-file game launcher built with **C# / .NET 10, Razor Pages
 
 Also included: SteamGridDB/local artwork, custom collections, global search, bundled launches, keyboard/controller navigation, fullscreen and optional Windows startup. The header browser shortcut saves a browser executable for this launcher only. Bundled launch options are collapsed by default in Add/Edit entry.
 
-Emulators currently means **emulator executables**, not ROM profiles. Metadata descriptions, saved scan roots, and ROM association remain future work. There is no sample library or fabricated artwork.
+Emulators currently means **emulator executables**, not ROM profiles. Metadata descriptions and ROM association remain future work. There is no sample library or fabricated artwork.
+
+### Bulk collection actions
+
+When at least one collection exists, Games and global search offer **Select entries** to reveal card checkboxes and bulk collection controls. **Done selecting** clears selection and returns to the compact title-only card footer (global search also retains its category link). The toolbar includes **Select all shown games**, **Clear selection**, and **Add selected** to a chosen collection. Bulk addition only adds memberships: games already in that collection are skipped, never toggled off. A notice reports added, already-present, and unavailable/non-game counts. Up to 500 games can be selected per request; selection is scoped to the current page/filter. The existing per-card Add to menu still toggles individual membership. Source-reviewed; rendered and runtime verification remain owner-run.
+
+### Saved scan locations
+
+On **Scan a folder**, choose a local folder, set **Include subfolders**, then select **Save location**. Saved locations persist across restarts and are shared across categories. Saving the same path again updates its subfolder preference. Each location has **Scan for changes**, which reuses the bounded scanner and shows launch files not already in the library for manual review/import into the current category. This is discovery, not file modification tracking or automatic synchronization. Unavailable folders produce an error, not an empty-success result. Removing a saved location removes only its bookmark, never entries or game files. Use **Settings → Library health** to check existing entries for missing targets. Locations are stored in `scan-locations.json` in the app data directory. Source-reviewed only; build, persistence, and UI walkthrough remain owner-run.
 
 ## Artwork-first dashboard layout
 

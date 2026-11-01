@@ -114,6 +114,7 @@ internal static class Program
         });
         builder.Services.AddSingleton(paths);
         builder.Services.AddSingleton<ScannerService>();
+        builder.Services.AddSingleton<SavedScanLocations>();
         builder.Services.AddSingleton<FolderPicker>();
         builder.Services.AddSingleton<DesktopPreferences>();
         builder.Services.AddSingleton<ThemePreferences>();

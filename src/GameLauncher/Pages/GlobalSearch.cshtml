@@ -17,7 +17,7 @@
 {
     <section class="empty-state"><h2>Find anything in your library</h2><p>Enter a title in the search box at the top right to search all three libraries.</p></section>
 }
-else if (!ViewData.ModelState.IsValid)
+else if (!ViewData.ModelState.IsValid && Model.Entries.Count == 0)
 {
     <p class="lede">The search could not be completed. Review the message above and try again.</p>
 }
@@ -34,6 +34,23 @@ else
             <span class="sort-chip">@category · @Model.Entries.Count(entry => entry.Category == category)</span>
         }
     </div>
+    @if (Model.Collections.Count > 0 && Model.Entries.Any(e => e.Category == LibraryCategory.Games))
+    {
+        <form id="bulk-collection" method="post" asp-page-handler="BulkAdd" asp-route-q="@Model.Q" class="bulk-toolbar" data-bulk-form>
+            <button type="button" class="button secondary" data-bulk-toggle aria-expanded="false" aria-controls="bulk-controls" hidden>Select entries</button>
+            <div id="bulk-controls" class="bulk-controls" data-bulk-controls>
+            <span data-bulk-count role="status" aria-live="polite">0 selected</span>
+            <button type="button" class="button secondary" data-bulk-all>Select all shown games</button>
+            <button type="button" class="button secondary" data-bulk-clear>Clear selection</button>
+            <label for="bulk-target">Add to collection</label>
+            <select id="bulk-target" name="targetCollectionId" required>
+                @foreach (var collection in Model.Collections) { <option value="@collection.Id">@collection.Name</option> }
+            </select>
+            <button type="submit" class="button primary" data-bulk-submit>Add selected</button>
+            <small>Existing members are skipped. Select up to 500 games; selection resets when you change pages or filters.</small>
+            </div>
+        </form>
+    }
     <section class="entry-grid" aria-label="Library entries">
     @foreach (var entry in Model.Entries)
     {
@@ -63,6 +80,13 @@ else
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                 Edit
                             </a>
+                            <form method="post" asp-page-handler="OpenContainingFolder" asp-antiforgery="true" asp-route-q="@Model.Q">
+                                <input type="hidden" name="id" value="@entry.Id" />
+                                <button type="submit" class="menu-item" role="menuitem" aria-label="Open containing folder for @entry.Title">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><path d="M3 9h18"/></svg>
+                                    Folder
+                                </button>
+                            </form>
                             @if (entry.Category == LibraryCategory.Games)
                             {
                                 <div class="menu-divider" role="separator"></div>
@@ -104,9 +128,13 @@ else
                 </div>
             </div>
             <div class="card-body">
+                @if (entry.Category == LibraryCategory.Games && Model.Collections.Count > 0)
+                {
+                    <label class="bulk-entry-select"><input type="checkbox" name="SelectedEntryIds" value="@entry.Id" form="bulk-collection" data-bulk-entry checked="@Model.SelectedEntryIds.Contains(entry.Id)" aria-label="Select @entry.Title for collection actions" /> Select</label>
+                }
                 <a class="result-category" asp-page="/Index" asp-route-category="@entry.Category">@entry.Category</a>
                 <h2 title="@entry.Title">@entry.Title</h2>
-                <p class="last-played">@(entry.LastLaunchedUtc.HasValue ? "Last launched " + entry.LastLaunchedUtc.Value.ToLocalTime().ToString("MMM d · h:mm tt") : "Not launched yet")</p>
+
             </div>
         </article>
     }

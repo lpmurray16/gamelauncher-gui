@@ -132,6 +132,29 @@ public sealed class CollectionService(IDbContextFactory<LibraryDbContext> factor
         finally { _writeGate.Release(); }
     }
 
+    public async Task<(int Added, int AlreadyPresent, int Unavailable)> AddEntriesAsync(Guid collectionId, IEnumerable<Guid> entryIds)
+    {
+        var ids = entryIds.Distinct().ToArray();
+        if (ids.Length is 0 or > 500) throw new ArgumentException("Select between 1 and 500 games.");
+        await _writeGate.WaitAsync();
+        try
+        {
+            await using var db = await factory.CreateDbContextAsync();
+            if (!await db.Collections.AnyAsync(x => x.Id == collectionId))
+                throw new InvalidOperationException("This collection no longer exists.");
+            var games = await db.Entries.Where(x => ids.Contains(x.Id) && x.Category == LibraryCategory.Games)
+                .Select(x => x.Id).ToListAsync();
+            var existing = (await db.CollectionEntries.Where(x => x.CollectionId == collectionId && ids.Contains(x.EntryId))
+                .Select(x => x.EntryId).ToListAsync()).ToHashSet();
+            var additions = games.Where(id => !existing.Contains(id)).ToArray();
+            foreach (var id in additions)
+                db.CollectionEntries.Add(new CollectionEntry { CollectionId = collectionId, EntryId = id });
+            await db.SaveChangesAsync();
+            return (additions.Length, games.Count - additions.Length, ids.Length - games.Count);
+        }
+        finally { _writeGate.Release(); }
+    }
+
     public async Task RemoveEntryAsync(Guid collectionId, Guid entryId)
     {
         await _writeGate.WaitAsync();

@@ -41,6 +41,7 @@ internal sealed class LauncherWindow : Form
         StartPosition = FormStartPosition.CenterScreen;
         Size = new Size(1320, 880);
         MinimumSize = new Size(820, 600);
+        WindowState = FormWindowState.Maximized;
         BackColor = Color.FromArgb(12, 14, 18);
         using var iconStream = System.Reflection.Assembly.GetExecutingAssembly()
             .GetManifestResourceStream("GameLauncher.icon.ico");

@@ -69,6 +69,30 @@ public sealed class LibraryService(IDbContextFactory<LibraryDbContext> factory, 
         return await db.Entries.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
     }
 
+    public async Task OpenContainingFolderAsync(Guid id)
+    {
+        var entry = await GetAsync(id)
+            ?? throw new InvalidOperationException("This entry no longer exists.");
+        // Validate the saved launch file, but never resolve or execute a shortcut's destination.
+        var target = LaunchTarget.Normalize(entry.TargetPath);
+        var directory = Path.GetDirectoryName(target);
+        if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
+            throw new DirectoryNotFoundException("The containing folder could not be found or accessed.");
+
+        var windowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        if (!Path.IsPathFullyQualified(windowsDirectory))
+            throw new InvalidOperationException("The Windows folder could not be located.");
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = Path.Combine(windowsDirectory, "explorer.exe"),
+            UseShellExecute = false
+        };
+        // One quoted argument, including for spaces and drive roots; no shell command or file launch.
+        startInfo.ArgumentList.Add(directory);
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Windows could not start File Explorer.");
+    }
+
     public async Task<Guid> SaveAsync(EntryInput input)
     {
         ValidateCategory(input.Category);

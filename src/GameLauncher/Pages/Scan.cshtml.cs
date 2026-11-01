@@ -12,7 +12,55 @@ public sealed class ScanModel : UiPageModel
     private readonly ScannerService _scanner;
     private readonly FolderPicker _picker;
     private readonly LibraryService _library;
-    public ScanModel(ScannerService scanner, FolderPicker picker, LibraryService library) { _scanner = scanner; _picker = picker; _library = library; }
+    private readonly SavedScanLocations _locations;
+    public ScanModel(ScannerService scanner, FolderPicker picker, LibraryService library, SavedScanLocations locations)
+    { _scanner = scanner; _picker = picker; _library = library; _locations = locations; }
+    public IReadOnlyList<SavedScanLocation> SavedLocations => _locations.GetAll();
+    public string? LocationsWarning => _locations.LoadWarning;
+
+    public IActionResult OnPostSaveLocation()
+    {
+        Category = SafeCategory(Category);
+        ModelState.Clear();
+        try
+        {
+            _locations.Save(Root, Recursive);
+            TempData["Notice"] = "Location saved. Saving the same folder updates its subfolder preference.";
+            return RedirectToPage(new { category = Category });
+        }
+        catch (Exception error) when (IsExpected(error)) { ShowError(error); return Page(); }
+    }
+
+    public IActionResult OnPostRemoveLocation(Guid locationId)
+    {
+        Category = SafeCategory(Category);
+        ModelState.Clear();
+        try
+        {
+            _locations.Remove(locationId);
+            TempData["Notice"] = "Saved location removed. Library entries and files were left untouched.";
+            return RedirectToPage(new { category = Category });
+        }
+        catch (Exception error) when (IsExpected(error)) { ShowError(error); return Page(); }
+    }
+
+    public async Task<IActionResult> OnPostScanLocationAsync(Guid locationId)
+    {
+        Category = SafeCategory(Category);
+        ModelState.Clear();
+        try
+        {
+            var location = _locations.Get(locationId);
+            Root = location.FolderPath;
+            Recursive = location.Recursive;
+            Result = await _scanner.ScanAsync(Root, Recursive, HttpContext.RequestAborted);
+            ScanId = Result.Id;
+            SelectedIds.Clear();
+        }
+        catch (Exception error) when (IsExpected(error))
+        { ModelState.AddModelError(string.Empty, "Could not scan this saved location. Check that the drive is connected and the folder is accessible. " + error.Message); }
+        return Page();
+    }
     [BindProperty(SupportsGet = true)] public LibraryCategory Category { get; set; } = LibraryCategory.Games;
     [BindProperty] public string Root { get; set; } = "";
     [BindProperty] public bool Recursive { get; set; } = true;
