@@ -68,7 +68,7 @@ initializeImageLoaders();
     });
     if (!valid) {
       warning.hidden = true;
-      status.textContent = 'Complete each hex color to preview or save. Your saved theme is unchanged.';
+      status.textContent = 'Enter valid hex colors to preview or save.';
       return;
     }
     const onAccent = luminance(palette.Accent) > .179 ? '#16110e' : '#ffffff';
@@ -85,9 +85,9 @@ initializeImageLoaders();
       .some((background) => contrast(palette.Text, background) < 4.5 || contrast(palette.Muted, background) < 4.5) ||
       contrast(onAccent, palette.Accent) < 4.5;
     warning.hidden = !lowContrast;
-    warning.textContent = lowContrast ? 'Some text/background combinations have low contrast. Consider adjusting them for readability. You can still save this theme.' : '';
+    warning.textContent = lowContrast ? 'Low text contrast. Adjust colors for readability.' : '';
     const changed = [...colors, ...radii].some((input) => input.value.toLowerCase() !== input.dataset.saved.toLowerCase());
-    status.textContent = changed ? 'Unsaved appearance changes. Select Save theme to keep them.' : 'No unsaved appearance changes.';
+    status.textContent = changed ? 'Unsaved changes — save to keep them.' : '';
   };
   colors.forEach((input) => {
     input.addEventListener('input', () => update());
@@ -104,7 +104,7 @@ initializeImageLoaders();
   form.querySelector('[data-theme-discard]').addEventListener('click', () => restore('saved'));
   form.querySelector('[data-theme-defaults]').addEventListener('click', () => {
     restore('default');
-    status.textContent = 'Default appearance previewed. Select Save theme to keep it, or Discard changes to return.';
+    status.textContent = 'Defaults previewed — save to keep them.';
   });
   // Restore attempted values after a failed save only when Appearance is visible.
   update(!form.closest('[data-settings-panel]').hidden);

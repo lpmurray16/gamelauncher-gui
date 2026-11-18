@@ -7,14 +7,7 @@
 {
     <p class="notice warning" role="alert">@warning</p>
 }
-<details class="settings-help">
-    <summary>About themes and live preview</summary>
-    <div class="settings-help-copy">
-        <p>Adjust colors and corners to preview Launchpad immediately. Save theme keeps your choices for every page and the next launch. Leaving this page without saving discards the preview.</p>
-        <p>Discard changes returns to your saved theme. Restore defaults previews the built-in colors and corners; select Save theme to keep them. Status colors, artwork overlays, circular icons, and Windows dialogs keep their own styling.</p>
-        <p>Appearance is stored in appearance.json in Launchpad's local data folder. This editor does not change the Android companion.</p>
-    </div>
-</details>
+
 <form method="post" asp-page="/Settings" asp-route-tab="appearance" asp-page-handler="Appearance" data-theme-editor data-busy-form data-busy-label="Saving theme…">
     <div class="theme-color-grid">
     @foreach (var color in GameLauncher.Services.ThemePreferences.ColorFields)
@@ -44,9 +37,9 @@
     <section class="theme-preview panel" aria-label="Theme preview">
         <h3>Live preview</h3>
         <div class="theme-preview-card">
-            <strong>Your library, your style</strong>
-            <p>Primary text on a card surface.</p>
-            <small>Secondary text and borders follow your palette.</small>
+            <strong>Preview</strong>
+            <p>Primary text</p>
+            <small>Secondary text</small>
             <div class="actions"><button type="button" class="button primary">Primary button</button><button type="button" class="button secondary">Secondary button</button></div>
         </div>
     </section>
@@ -55,5 +48,5 @@
         <button type="button" class="button secondary" data-theme-discard>Discard changes</button>
         <button type="button" class="button secondary" data-theme-defaults>Restore defaults</button>
     </div>
-    <p data-theme-status role="status" aria-live="polite">Preview changes before saving.</p>
+    <p data-theme-status role="status" aria-live="polite">Changes preview immediately. Save to keep them.</p>
 </form>
